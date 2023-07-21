@@ -2,17 +2,20 @@ window.confirm = function () {
     return true;
 };
 
+const settingsKey = "dodeca_settings";
 let settings = {
     // setting to reset after X sigils, 0 to disable
+    mine_gold_clicks: {"name": "Mine gold clicks/sec", "value": 0, "type": "number"},
+    buy_miners: {"name": "Buy miners", "value": true, "type": "boolean"},
     reset_sigils_after: {"name": "Reset sigils after", "value": 0, "type": "number"},
     disable_cyan_sigil_upgrades: {"name": "Disable cyan sigil upgrades", "value": false, "type": "boolean"},
 }
 
 // get settings from local storage if they exist
-cached_settings = JSON.parse(localStorage.getItem('settings'));
+cached_settings = JSON.parse(localStorage.getItem(settingsKey));
 // override default settings with cached settings for every setting that exists
 for (let setting in cached_settings) {
-    if (cached_settings.hasOwnProperty(setting)) {
+    if (cached_settings.hasOwnProperty(setting) && settings.hasOwnProperty(setting)) {
         settings[setting].value = cached_settings[setting].value;
     }
 }
@@ -28,6 +31,20 @@ function buy_fire_upgrades() {
 }
 
 function buy_platinum_upgrades() {
+    const buttons = document.getElementsByClassName("platinumUpgrade");
+    if (!buttons[4].disabled) {
+        // Convert platinum: click on platinumConvertButton
+        document.getElementById("platinumConvertButton").click();
+        // Focus on the 5th platinum upgrade
+        buttons[4].click()
+        return;
+    }
+
+    if (!buttons[2].disabled) {
+        buttons[2].click()
+        return;
+    }
+
     document.getElementById("platinumMaxAllButton").click();
 }
 
@@ -75,6 +92,12 @@ function buy_dragon_feed() {
 }
 
 function buy_upgrades() {
+    unlock_dragon()
+    upgrade_dragon()
+    unlock_fire_upgrade()
+    unlock_alchemy_upgrade()
+    unlock_magic_upgrade()
+    buy_miners()
     buy_fire_upgrades();
     buy_platinum_upgrades();
     buy_uranium_upgrades();
@@ -96,12 +119,111 @@ function get_score(n) {
     return parseFloat(score);
 }
 
+function get_mine_gold_button() {
+    const buttons = document.getElementsByTagName("button");
+    for (let i = 0; i < buttons.length; i++) {
+        if (buttons[i].innerText === "Mine gold") {
+            return buttons[i];
+        }
+    }
+}
+
+function get_current_gold() {
+    const gold = document.getElementById("gold").innerText.replaceAll(",", "").replaceAll(".", "")
+    return parseFloat(gold);
+}
+
+function get_current_magic() {
+    const magic = document.getElementById("magic").innerText.replaceAll(",", "").replaceAll(".", "")
+    return parseFloat(magic);
+}
+
+function get_gold_per_second() {
+    const gold_per_second = document.getElementById("goldPerSecond").innerText.replaceAll(",", "").replaceAll(".", "")
+    return parseFloat(gold_per_second);
+}
+
+const mine_gold_button = get_mine_gold_button()
+
+async function mine_gold() {
+    const mine_gold = settings.mine_gold_clicks.value
+    for (let i = 0; i < mine_gold; i++) {
+        mine_gold_button.click();
+    }
+}
+
+async function mine_starting_gold() {
+    while (get_gold_per_second() < 20) {
+        mine_gold_button.click();
+        buy_miners()
+        await delay(10)
+    }
+}
+
+function buy_miners() {
+    const buy_miners = settings.buy_miners.value
+    if (!buy_miners) return;
+    document.getElementById("buyMinerButton").click();
+}
+
+function has_dragon() {
+    const unlock_dragon_button = document.getElementById("unlockDragonButton");
+    return unlock_dragon_button.style.display === "none";
+}
+
+function unlock_dragon() {
+    if (has_dragon()) return;
+    document.getElementById("unlockDragonButton").click();
+}
+
+function has_fire_upgrade() {
+    const fire_upgrade = document.getElementById("buyFireUpgradesButton");
+    return fire_upgrade.style.display === "none";
+}
+
+function unlock_fire_upgrade() {
+    if (has_fire_upgrade()) return;
+    document.getElementById("buyFireUpgradesButton").click();
+}
+
+function has_alchemy_upgrade() {
+    // unlockAlchemyButton
+    const alchemy_upgrade =  document.getElementById("unlockAlchemyButton");
+    return alchemy_upgrade.style.display === "none";
+}
+
+function unlock_alchemy_upgrade() {
+    if (has_alchemy_upgrade()) return;
+    document.getElementById("unlockAlchemyButton").click();
+}
+
+function has_magic_upgrade() {
+    const magic_upgrade = document.getElementById("unlockMagicButton");
+    return magic_upgrade.style.display === "none";
+}
+
+function unlock_magic_upgrade() {
+    if (has_magic_upgrade()) return;
+    document.getElementById("unlockMagicButton").click();
+
+}
+
+function upgrade_dragon() {
+    const buttons = document.getElementsByClassName("upgradeDragonButton");
+    for (let i = 0; i < buttons.length; i++) {
+        if (buttons[i].style.display !== "none") {
+            buttons[i].click();
+        }
+    }
+}
+
 function should_do_challenge(score_before, score_after) {
     if (score_before === 0) return true;
     return score_after >= score_before * 1.1;
 }
 
 async function do_challenge(n) {
+    if (!get_current_magic() < 1000000) return;
 
     if (challenge_cool_down[n] > 0) {
         challenge_cool_down[n] -= 1;
@@ -189,6 +311,10 @@ async function do_challenges() {
 async function idle_loop(mSecs = 5) {
     console.log("idle loop for " + mSecs + " seconds")
     for (let i = 0; i < mSecs; i++) {
+        if (settings.mine_gold_clicks.value > 0) {
+            await mine_gold()
+        }
+
         buy_upgrades()
         await delay(1000);
     }
@@ -242,7 +368,7 @@ function create_settings_window() { // Create the settings overlay and modal ele
             } else {
                 settings[setting].value = settingInput.value; // Update non-boolean settings
             }
-            localStorage.setItem('settings', JSON.stringify(settings));
+            localStorage.setItem(settingsKey, JSON.stringify(settings));
         });
 
         settingInput.style.marginLeft = '10px';
@@ -280,6 +406,8 @@ function create_settings_window() { // Create the settings overlay and modal ele
     const resetBtn = document.createElement('button');
     resetBtn.textContent = 'Reset to default';
     resetBtn.addEventListener('click', () => {
+        localStorage.removeItem(settingsKey);
+        window.location.reload();
     })
     settingsModal.appendChild(resetBtn);
 
@@ -293,6 +421,8 @@ function create_settings_window() { // Create the settings overlay and modal ele
 
 
 async function game_loop() {
+    await mine_starting_gold()
+
     // do 5 challenge loops
     for (let i = 0; i < 5; i++) {
         await do_challenges()
@@ -306,3 +436,4 @@ async function game_loop() {
 // start the game loop
 create_settings_window()
 await game_loop();
+
