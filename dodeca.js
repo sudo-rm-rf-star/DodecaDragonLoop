@@ -115,32 +115,17 @@ async function do_challenges() {
     }
 }
 
-function can_befriend_dragon() {
-    return !document.getElementById("dragonSpendTimeButton").disabled;
-}
-
-async function befriend_dragon() {
-    console.log("Befriending dragon")
-
-    // Wait until we can befriend the dragon
-    while (!can_befriend_dragon()) {
-        await delay(1000);
+async function idle_loop(mSecs = 5) {
+    console.log("idle loop for " + mSecs + " seconds")
+    for (let i = 0; i < mSecs; i++) {
         buy_upgrades()
-    }
-
-    document.getElementById("dragonSpendTimeButton").click();
-    while (!can_befriend_dragon()) {
         await delay(1000);
-        buy_upgrades()
     }
 }
 
-async function idle_loop() {
-    console.log("idle loop")
-    for (let i = 0; i < 5; i++) {
-        buy_upgrades()
-        await delay(1000);
-    }
+function get_dragon_time_cooldown() {
+    const dragon_time_cooldown = document.getElementById("dragonTimeCooldown").innerText;
+    return parseInt(dragon_time_cooldown);
 }
 
 async function game_loop() {
@@ -150,7 +135,7 @@ async function game_loop() {
         await idle_loop()
     }
 
-    await befriend_dragon()
+    await idle_loop(get_dragon_time_cooldown() + 1)
 
     // call this function again in 1 second
     setTimeout(game_loop, 1000);
