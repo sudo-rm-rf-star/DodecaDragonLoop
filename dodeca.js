@@ -15,6 +15,14 @@ function buy_uranium_upgrades() {
     document.getElementById("uraniumMaxAllButton").click();
 }
 
+// buy magic upgrades with class "magicUpgrade"
+function buy_magic_upgrades() {
+    const buttons = document.getElementsByClassName("magicUpgrade");
+    for (let i = 0; i < buttons.length; i++) {
+        buttons[i].click();
+    }
+}
+
 function buy_dark_magic_upgrades() {
     const buttons = document.getElementsByClassName("darkMagicUpgrade");
     for (let i = 0; i < buttons.length; i++) {
@@ -38,11 +46,12 @@ function buy_upgrades() {
     buy_platinum_upgrades();
     buy_uranium_upgrades();
     buy_cyan_sigil_upgrades();
+    buy_magic_upgrades();
     buy_dark_magic_upgrades();
     buy_dragon_feed();
 }
 
-const CHALLENGE_COMBINATIONS = [
+let CHALLENGE_COMBINATIONS = [
     [3], [2, 3], [0, 2, 3], [0, 1, 2, 3]
 ]
 
@@ -51,29 +60,26 @@ let score_after = [0, 0, 0, 0];
 let challenge_cool_down = [0, 0, 0, 0];
 
 function get_score(n) {
-    // get element with id magicScoreN where N is the challenge number
-    console.log("magicScore" + (n + 1))
-    const score = document.getElementById("magicScore" + (n + 1)).innerText;
+    const score = document.getElementById("magicScore" + (n + 1)).innerText.replaceAll(",", "").replaceAll(".", "")
     return parseFloat(score);
 }
 
 function should_do_challenge(n) {
     if(score_before[n] === 0) return true;
-    // score after should be at least 1.2 times the score before
-    return score_after[n] >= score_before[n] * 1.2;
+    return score_after[n] >= score_before[n] * 1.1;
 }
 
-// create a function to do the nth challenge (n is the parameter)
 async function do_challenge(n) {
 
     if(challenge_cool_down[n] > 0) {
-        console.log("Skipping challenge " + n + " because of cooldown")
         challenge_cool_down[n] -= 1;
         return;
     }
 
-    console.log("Doing challenge " + n)
     score_before[n] = get_score(n);
+    // doing challenge, current score is
+    console.log("doing challenge " + n + " with score " + score_before[n])
+
     const challenge_combo = CHALLENGE_COMBINATIONS[n];
     enable_challenge_combo(challenge_combo)
     start_challenge()
@@ -87,10 +93,15 @@ async function do_challenge(n) {
     // end challenge
     stop_challenge()
     score_after[n] = get_score(n);
+    console.log("done challenge " + n + " with score " + score_after[n])
 
     if(!should_do_challenge(n)) {
-        console.log("Disabling challenge " + n + " because of low score: " + score_after[n] + " < " + score_before[n] * 1.2)
+        // console log why disabling
+        console.log("Disabling challenge " + n + " because score after is " + score_after[n] + " and score before is " + score_before[n])
         challenge_cool_down[n] = 5; // skip 5 loops
+    }
+    else {
+        challenge_cool_down = [0, 0, 0, 0]
     }
 }
 
