@@ -10,13 +10,14 @@ let settings = {
     mine_gold_clicks: {"name": "Mine gold clicks/sec", "value": 1, "type": "number"},
     buy_miners: {"name": "Buy miners", "value": true, "type": "boolean"},
     time_in_challenge: {"name": "Seconds per challenge", "value": 3, "type": "number"},
+    reset_cooldown: {"name": "Reset cooldown", "value": 0, "type": "number"},
     reset_magic_after: {"name": "Reset magic after", "value": 0, "type": "number"},
-    rotate_sigils: {"name": "Rotate sigils", "value": true, "type": "boolean"},
-    reset_cyan_sigils: {"name": "Reset cyan sigils", "value": false, "type": "boolean"},
-    reset_blue_sigils: {"name": "Reset blue sigils", "value": false, "type": "boolean"},
-    reset_indigo_sigils: {"name": "Reset indigo sigils", "value": false, "type": "boolean"},
-    reset_violet_sigils: {"name": "Reset violet sigils", "value": false, "type": "boolean"},
     reset_sigils_after: {"name": "Reset sigils after", "value": 1, "type": "number"},
+    reset_cyan_sigils: {"name": "Reset cyan sigils", "value": true, "type": "boolean"},
+    reset_blue_sigils: {"name": "Reset blue sigils", "value": true, "type": "boolean"},
+    reset_indigo_sigils: {"name": "Reset indigo sigils", "value": true, "type": "boolean"},
+    reset_violet_sigils: {"name": "Reset violet sigils", "value": true, "type": "boolean"},
+    reset_pink_sigils: {"name": "Reset pinks sigils", "value": true, "type": "boolean"},
 }
 
 let statistics = {
@@ -31,6 +32,7 @@ let statistics = {
     totalBlueResets : {"name": "Total blue resets", "value": 0, "type": "number"},
     totalIndigoResets : {"name": "Total indigo resets", "value": 0, "type": "number"},
     totalVioletResets : {"name": "Total violet resets", "value": 0, "type": "number"},
+    totalPinkResets : {"name": "Total pink resets", "value": 0, "type": "number"},
 }
 
 // get settings from local storage if they exist
@@ -73,46 +75,30 @@ function gets_automatic_challenge_rating() {
 
 function get_available_sigils() {
     const [_, exp] = parseExponent(statistics.maxGold.value)
-    if (exp >= 30000) {
-        return 4;
+    let available_sigils = [];
+    if (exp >= 300000 && settings.reset_pink_sigils.value) {
+        available_sigils.push("pink");
     }
-    if (exp >= 16000) {
-        return 3;
+    if (exp >= 30000 && settings.reset_violet_sigils.value) {
+        available_sigils.push("violet");
     }
-    if (exp >= 8000) {
-        return 2;
+    if (exp >= 16000 && settings.reset_indigo_sigils.value) {
+        available_sigils.push("indigo");
     }
-    if (exp >= 2000) {
-        return 1;
+    if (exp >= 8000 && settings.reset_blue_sigils.value) {
+        available_sigils.push("blue");
     }
-    return 0;
+    if (exp >= 2000 && settings.reset_cyan_sigils.value) {
+        available_sigils.push("cyan");
+    }
+    return available_sigils
 }
 
-let availableSigils = 1;
 let currentSigilRotation = 0
 function sigil_to_reset() {
-    // first look at settings to see if we should reset a specific sigil, otherwise look at what we can reset
-    if (settings.rotate_sigils.value) {
-        if(currentSigilRotation === 0) return "cyan"
-        if(currentSigilRotation === 1) return "blue"
-        if(currentSigilRotation === 2) return "indigo"
-        if(currentSigilRotation === 3) return "violet"
-    }
-
-    if (settings.reset_violet_sigils.value) {
-        return "violet";
-    }
-    if (settings.reset_indigo_sigils.value) {
-        return "indigo";
-    }
-    if (settings.reset_blue_sigils.value) {
-        return "blue";
-    }
-    if (settings.reset_cyan_sigils.value) {
-        return "cyan";
-    }
-
-    return "cyan"
+    if(statistics.timeSinceLastReset.value < settings.reset_cooldown.value) return;
+    const available_sigils = get_available_sigils();
+    return available_sigils[currentSigilRotation % available_sigils.length];
 }
 
 function delay(time) {
@@ -259,12 +245,13 @@ function buy_indigo_sigil_upgrades() {
 
 function buy_violet_sigil_upgrades() {
     const buttons = document.getElementsByClassName("violetSigilUpgrade");
-    if (!buttons[3].disabled && get_current_violet_sigil_power() > 2000) {
-        // Focus on the 4th violet sigil upgrade
-        buttons[3].click()
-        return;
+    for (let i = 0; i < buttons.length; i++) {
+        buttons[i].click();
     }
+}
 
+function buy_pink_sigil_upgrades() {
+    const buttons = document.getElementsByClassName("pinkSigilUpgrade");
     for (let i = 0; i < buttons.length; i++) {
         buttons[i].click();
     }
@@ -283,7 +270,6 @@ function reset_progress_for_magic() {
     should_reset |= !gets_automatic_magic() && reset_magic_after === 0 && magic_to_get > get_current_magic() * 2
 
     if (should_reset) {
-        console.log("resetting magic")
         document.getElementById("magicToGet").parentElement.click();
         post_reset()
         statistics.totalMagicResets.value += 1;
@@ -293,8 +279,7 @@ function reset_progress_for_magic() {
 function post_reset() {
     statistics.timeForLastReset.value = Math.floor((Date.now() - statistics.lastResetTime.value) / 1000)
     statistics.lastResetTime.value = new Date().getTime();
-    availableSigils = get_available_sigils();
-    currentSigilRotation = (currentSigilRotation + 1) % availableSigils;
+    currentSigilRotation++
 }
 
 function get_dragon_cooldown() {
@@ -314,7 +299,6 @@ function reset_progress_for_cyan_sigils() {
     const reset_sigils_after = settings.reset_sigils_after.value
     const sigils_to_get = parseInt(document.getElementById("cyanSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
-        console.log('resetting cyan sigils')
         document.getElementById("cyanSigilsToGet").parentElement.click();
         post_reset()
         statistics.totalCyanResets.value += 1;
@@ -329,7 +313,6 @@ function reset_progress_for_blue_sigils() {
     const reset_sigils_after = settings.reset_sigils_after.value
     const sigils_to_get = parseInt(document.getElementById("blueSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
-        console.log('resetting blue sigils')
         document.getElementById("blueSigilsToGet").parentElement.click();
         post_reset()
         statistics.totalBlueResets.value += 1;
@@ -344,7 +327,6 @@ function reset_progress_for_indigo_sigils() {
     const reset_sigils_after = settings.reset_sigils_after.value
     const sigils_to_get = parseInt(document.getElementById("indigoSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
-        console.log('resetting indigo sigils')
         document.getElementById("indigoSigilsToGet").parentElement.click();
         post_reset()
         statistics.totalIndigoResets.value += 1;
@@ -359,11 +341,24 @@ function reset_progress_for_violet_sigils() {
     const reset_sigils_after = settings.reset_sigils_after.value
     const sigils_to_get = parseInt(document.getElementById("violetSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
-        console.log('resetting violet sigils')
         document.getElementById("violetSigilsToGet").parentElement.click();
         post_reset()
         statistics.totalVioletResets.value += 1;
         statistics.sigilLastReset.value = "violet";
+    }
+}
+
+function reset_progress_for_pink_sigils() {
+    const reset_this_sigil = sigil_to_reset() === "pink"
+    if(!reset_this_sigil) return;
+
+    const reset_sigils_after = settings.reset_sigils_after.value
+    const sigils_to_get = parseInt(document.getElementById("pinkSigilsToGet").innerText);
+    if (sigils_to_get >= reset_sigils_after) {
+        document.getElementById("pinkSigilsToGet").parentElement.click();
+        post_reset()
+        statistics.totalPinkResets.value += 1;
+        statistics.sigilLastReset.value = "pink";
     }
 }
 
@@ -397,12 +392,14 @@ function buy_upgrades() {
     buy_cyan_sigil_upgrades();
     buy_blue_sigil_upgrades();
     buy_indigo_sigil_upgrades();
-    buy_violet_sigil_upgrades()
+    buy_violet_sigil_upgrades();
+    buy_pink_sigil_upgrades();
     reset_progress_for_magic();
     reset_progress_for_cyan_sigils();
     reset_progress_for_blue_sigils()
     reset_progress_for_indigo_sigils()
     reset_progress_for_violet_sigils()
+    reset_progress_for_pink_sigils()
 }
 
 let EASY_CHALLENGE_COMBOS = [
@@ -414,6 +411,7 @@ let HARD_CHALLENGE_COMBOS = [
 ]
 
 let challenge_cool_down = [0, 0, 0, 0];
+let reset_cool_down = 5;
 
 function get_score(n) {
     const score = document.getElementById("magicScore" + (n + 1)).innerText.replaceAll(",", "").replaceAll(".", "")
