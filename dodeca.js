@@ -18,6 +18,8 @@ let settings = {
     reset_indigo_sigils: {"name": "Reset indigo sigils", "value": true, "type": "boolean"},
     reset_violet_sigils: {"name": "Reset violet sigils", "value": true, "type": "boolean"},
     reset_pink_sigils: {"name": "Reset pinks sigils", "value": true, "type": "boolean"},
+    keep_percent_sigils: {"name": "Keep percent sigils", "value": 90, "type": "number"},
+    keep_percent_knowledge: {"name": "Keep percent knowledge", "value": 90, "type": "number"},
 }
 
 let statistics = {
@@ -33,6 +35,11 @@ let statistics = {
     totalIndigoResets : {"name": "Total indigo resets", "value": 0, "type": "number"},
     totalVioletResets : {"name": "Total violet resets", "value": 0, "type": "number"},
     totalPinkResets : {"name": "Total pink resets", "value": 0, "type": "number"},
+    maxCyanSigils : {"name": "Max cyan sigils", "value": 0, "type": "number", visible: false},
+    maxBlueSigils : {"name": "Max blue sigils", "value": 0, "type": "number", visible: false},
+    maxIndigoSigils : {"name": "Max indigo sigils", "value": 0, "type": "number", visible: false},
+    maxVioletSigils : {"name": "Max violet sigils", "value": 0, "type": "number", visible: false},
+    maxPinkSigils : {"name": "Max pink sigils", "value": 0, "type": "number", visible: false},
 }
 
 // get settings from local storage if they exist
@@ -66,7 +73,7 @@ for (let statistic in cached_statistics) {
 localStorage.setItem(settingsKey, JSON.stringify(settings));
 
 function gets_automatic_magic() {
-    return get_current_magic() > 1000000000;
+    return document.getElementById("ach3x4").classList.contains("achievementUnlocked");
 }
 
 function gets_automatic_challenge_rating() {
@@ -98,6 +105,7 @@ let currentSigilRotation = 0
 function sigil_to_reset() {
     if(statistics.timeSinceLastReset.value < settings.reset_cooldown.value) return;
     const available_sigils = get_available_sigils();
+    if(available_sigils.length === 0) return;
     return available_sigils[currentSigilRotation % available_sigils.length];
 }
 
@@ -252,8 +260,37 @@ function buy_violet_sigil_upgrades() {
 
 function buy_pink_sigil_upgrades() {
     const buttons = document.getElementsByClassName("pinkSigilUpgrade");
+    if (!buttons[3].disabled && get_current_pink_sigil_power() > 10000000) {
+        // Focus on the 4th indigo sigil upgrade
+        buttons[3].click()
+        return;
+    }
+
     for (let i = 0; i < buttons.length; i++) {
         buttons[i].click();
+    }
+}
+
+function get_current_knowledge() {
+    return parseNumber(document.getElementById("knowledge").innerText);
+}
+
+function buy_knowledge_upgrades() {
+    const buttons = document.getElementsByClassName("knowledgeUpgrade");
+    const maxKnowledgeToSpent = (1 - settings.keep_percent_knowledge.value / 100) * get_current_knowledge();
+
+    if (!buttons[2].disabled && get_current_knowledge() > 20000) {
+        if(maxKnowledgeToSpent < 100000) return;
+        buttons[2].click()
+        return;
+    }
+
+    for (let i = 0; i < buttons.length; i++) {
+        if(i === 2) continue;
+        const cost = parseNumber(document.getElementById(`knowledgeUpgrade${i + 1}Cost`).innerText);
+        if(cost < maxKnowledgeToSpent) {
+            buttons[i].click();
+        }
     }
 }
 
@@ -294,9 +331,9 @@ function spend_time_with_dragon() {
 
 function reset_progress_for_cyan_sigils() {
     const reset_this_sigil = sigil_to_reset() === "cyan"
-    if(!reset_this_sigil) return;
-
     const reset_sigils_after = settings.reset_sigils_after.value
+    if(!reset_this_sigil || reset_sigils_after === 0) return;
+
     const sigils_to_get = parseInt(document.getElementById("cyanSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
         document.getElementById("cyanSigilsToGet").parentElement.click();
@@ -308,9 +345,9 @@ function reset_progress_for_cyan_sigils() {
 
 function reset_progress_for_blue_sigils() {
     const reset_this_sigil = sigil_to_reset() === "blue"
-    if(!reset_this_sigil) return;
-
     const reset_sigils_after = settings.reset_sigils_after.value
+    if(!reset_this_sigil || reset_sigils_after === 0) return;
+
     const sigils_to_get = parseInt(document.getElementById("blueSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
         document.getElementById("blueSigilsToGet").parentElement.click();
@@ -322,9 +359,9 @@ function reset_progress_for_blue_sigils() {
 
 function reset_progress_for_indigo_sigils() {
     const reset_this_sigil = sigil_to_reset() === "indigo"
-    if(!reset_this_sigil) return;
-
     const reset_sigils_after = settings.reset_sigils_after.value
+    if(!reset_this_sigil || reset_sigils_after === 0) return;
+
     const sigils_to_get = parseInt(document.getElementById("indigoSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
         document.getElementById("indigoSigilsToGet").parentElement.click();
@@ -336,9 +373,9 @@ function reset_progress_for_indigo_sigils() {
 
 function reset_progress_for_violet_sigils() {
     const reset_this_sigil = sigil_to_reset() === "violet"
-    if(!reset_this_sigil) return;
-
     const reset_sigils_after = settings.reset_sigils_after.value
+    if(!reset_this_sigil || reset_sigils_after === 0) return;
+
     const sigils_to_get = parseInt(document.getElementById("violetSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
         document.getElementById("violetSigilsToGet").parentElement.click();
@@ -350,9 +387,9 @@ function reset_progress_for_violet_sigils() {
 
 function reset_progress_for_pink_sigils() {
     const reset_this_sigil = sigil_to_reset() === "pink"
-    if(!reset_this_sigil) return;
-
     const reset_sigils_after = settings.reset_sigils_after.value
+    if(!reset_this_sigil || reset_sigils_after === 0) return;
+
     const sigils_to_get = parseInt(document.getElementById("pinkSigilsToGet").innerText);
     if (sigils_to_get >= reset_sigils_after) {
         document.getElementById("pinkSigilsToGet").parentElement.click();
@@ -394,6 +431,8 @@ function buy_upgrades() {
     buy_indigo_sigil_upgrades();
     buy_violet_sigil_upgrades();
     buy_pink_sigil_upgrades();
+    buy_knowledge_upgrades()
+    buy_knowledge_trade();
     reset_progress_for_magic();
     reset_progress_for_cyan_sigils();
     reset_progress_for_blue_sigils()
@@ -432,6 +471,11 @@ function parseNumber(str) {
     return parseFloat(str);
 }
 
+function parseNumberRange(str) {
+    // e.g. 42,100 - 126,500
+    return str.split(" - ").map(parseNumber)
+}
+
 function parseExponent(str) {
     str = str.replaceAll(",", "").replaceAll(".", "")
     if (!str.includes("e")) {
@@ -459,39 +503,117 @@ function get_current_magic() {
     return parseFloat(magic);
 }
 
-function get_current_cyan_sigils() {
-    const cyan_sigils = document.getElementById("cyanSigils").innerText.replaceAll(",", "").replaceAll(".", "")
-    return parseFloat(cyan_sigils);
+const get_current_cyan_sigils = () => parseNumber(document.getElementById("cyanSigils").innerText)
+const get_current_blue_sigils = () => parseNumber(document.getElementById("blueSigils").innerText)
+const get_current_indigo_sigils = () => parseNumber(document.getElementById("indigoSigils").innerText)
+const get_current_violet_sigils = () => parseNumber(document.getElementById("violetSigils").innerText)
+const get_current_pink_sigils = () => parseNumber(document.getElementById("pinkSigils").innerText)
+const get_current_cyan_sigil_power = () => parseNumber(document.getElementById("cyanSigilPower").innerText)
+const get_current_blue_sigil_power = () => parseNumber(document.getElementById("blueSigilPower").innerText)
+const get_current_indigo_sigil_power = () => parseNumber(document.getElementById("indigoSigilPower").innerText)
+const get_current_violet_sigil_power = () => parseNumber(document.getElementById("violetSigilPower").innerText)
+const get_current_pink_sigil_power = () => parseNumber(document.getElementById("pinkSigilPower").innerText)
+const get_gold_per_second = () => parseNumber(document.getElementById("goldPerSecond").innerText)
+
+function set_trade_level(level) {
+ // knowledgeLevelInput, id="knowledgeLevelRange"
+    const knowledge_level_input = document.getElementById("knowledgeLevelInput");
+    const knowledge_level_range = document.getElementById("knowledgeLevelRange");
+    knowledge_level_input.value = level
+    knowledge_level_range.value = level
+    knowledge_level_input.dispatchEvent(new Event('input', { bubbles: true }));
+    knowledge_level_range.dispatchEvent(new Event('input', { bubbles: true }));
+
 }
 
-function get_current_blue_sigils() {
-    const blue_sigils = document.getElementById("blueSigils").innerText.replaceAll(",", "").replaceAll(".", "")
-    return parseFloat(blue_sigils);
+function get_knowledge_cost(level, sigil) {
+    set_trade_level(level)
+    const sigils = ["cyan", "blue", "indigo", "violet", "pink"]
+    const sigilIndex = sigils.indexOf(sigil)
+    const knowledge_trade_cost_ranges = document.getElementsByClassName("knowledgeTradeCostRange");
+    const knowledge_trade_cost_range = knowledge_trade_cost_ranges[sigilIndex].innerText.split(" - ");
+    return parseNumber(knowledge_trade_cost_range[1])
 }
 
-function get_current_cyan_sigil_power() {
-    const cyan_sigil_power = document.getElementById("cyanSigilPower").innerText.replaceAll(",", "").replaceAll(".", "")
-    return parseFloat(cyan_sigil_power);
+function choose_trade_level() {
+    // get max of knowledgeLevelInput
+    const knowledge_level_input = document.getElementById("knowledgeLevelInput");
+    const knowledge_level_range = document.getElementById("knowledgeLevelRange");
+    const max_level = knowledge_level_input.max;
+    const min_level = knowledge_level_input.min;
+    const buy_ratio = (1 - settings.keep_percent_sigils.value / 100)
+    const max_cyan_sigils_to_spent = buy_ratio * statistics.maxCyanSigils.value
+    const max_blue_sigils_to_spent = buy_ratio * statistics.maxBlueSigils.value
+    const max_indigo_sigils_to_spent = buy_ratio * statistics.maxIndigoSigils.value
+    const max_violet_sigils_to_spent = buy_ratio * statistics.maxVioletSigils.value
+    const max_pink_sigils_to_spent = buy_ratio * statistics.maxPinkSigils.value
+
+    for (let i = max_level; i >= min_level; i--) {
+        set_trade_level(i)
+        const should_choose_level = get_knowledge_cost(i, "cyan") <= max_cyan_sigils_to_spent
+            && get_knowledge_cost(i, "blue") <= max_blue_sigils_to_spent
+            && get_knowledge_cost(i, "indigo") <= max_indigo_sigils_to_spent
+            && get_knowledge_cost(i, "violet") <= max_violet_sigils_to_spent
+            && get_knowledge_cost(i, "pink") <= max_pink_sigils_to_spent
+
+        if(should_choose_level) {
+            console.log("Choosing level " + i)
+            return;
+        }
+    }
 }
 
-function get_current_blue_sigil_power() {
-    const blue_sigil_power = document.getElementById("blueSigilPower").innerText.replaceAll(",", "").replaceAll(".", "")
-    return parseFloat(blue_sigil_power);
-}
+function buy_knowledge_trade() {
+    const knowledge_trades = document.getElementsByClassName("knowledgeTradeDiv");
+    for (let i = knowledge_trades.length - 1; i >= 0; i--) {
+        const knowledge_trade = knowledge_trades[i];
+        // get child element with class knowledgeTradeInfo
+        const knowledge_trade_info = knowledge_trade.getElementsByClassName("knowledgeTradeInfo")[0];
 
-function get_current_indigo_sigil_power() {
-    const indigo_sigil_power = document.getElementById("indigoSigilPower").innerText.replaceAll(",", "").replaceAll(".", "")
-    return parseFloat(indigo_sigil_power);
-}
+        // parse the inner text for sigil costs
+        const knowledge_trade_cost = knowledge_trade_info.innerText.split("Costs:")[1]
 
-function get_current_violet_sigil_power() {
-    const violet_sigil_power = document.getElementById("violetSigilPower").innerText.replaceAll(",", "").replaceAll(".", "")
-    return parseFloat(violet_sigil_power);
-}
+        let cyan_sigil_cost = 0;
+        let blue_sigil_cost = 0;
+        let indigo_sigil_cost = 0;
+        let violet_sigil_cost = 0;
+        let pink_sigil_cost = 0;
 
-function get_gold_per_second() {
-    const gold_per_second = document.getElementById("goldPerSecond").innerText.replaceAll(",", "").replaceAll(".", "")
-    return parseFloat(gold_per_second);
+        knowledge_trade_cost.split("\n").forEach((line) => {
+            if (line.includes("cyan sigils")) {
+                cyan_sigil_cost = parseNumber(line.split("cyan sigils")[0])
+            }
+            if (line.includes("blue sigils")) {
+                blue_sigil_cost = parseNumber(line.split("blue sigils")[0])
+            }
+            if (line.includes("indigo sigils")) {
+                indigo_sigil_cost = parseNumber(line.split("indigo sigils")[0])
+            }
+            if (line.includes("violet sigils")) {
+                violet_sigil_cost = parseNumber(line.split("violet sigils")[0])
+            }
+            if (line.includes("pink sigils")) {
+                pink_sigil_cost = parseNumber(line.split("pink sigils")[0])
+            }
+        })
+
+        const buy_ratio = (1 - settings.keep_percent_sigils.value / 100)
+        const cur_cyan_sigils_to_spent = buy_ratio * get_current_cyan_sigils()
+        const cur_blue_sigils_to_spent = buy_ratio * get_current_blue_sigils()
+        const cur_indigo_sigils_to_spent = buy_ratio * get_current_indigo_sigils()
+        const cur_violet_sigils_to_spent = buy_ratio * get_current_violet_sigils()
+        const cur_pink_sigils_to_spent = buy_ratio * get_current_pink_sigils()
+
+        const can_buy_knowledge_level = cur_cyan_sigils_to_spent >= cyan_sigil_cost && cur_blue_sigils_to_spent >= blue_sigil_cost && cur_indigo_sigils_to_spent >= indigo_sigil_cost && cur_violet_sigils_to_spent >= violet_sigil_cost && cur_pink_sigils_to_spent >= pink_sigil_cost
+        if(can_buy_knowledge_level) {
+            choose_trade_level()
+            knowledge_trade.getElementsByTagName("button")[0].click();
+            return true;
+        }
+
+    }
+
+    return false;
 }
 
 const mine_gold_button = get_mine_gold_button()
@@ -902,6 +1024,12 @@ function update_statistics() {
     if (compareExponent(parseExponent(curGold), parseExponent(maxGold)) > 0) {
         statistics.maxGold.value = curGold
     }
+
+    statistics.maxBlueSigils.value = Math.max(statistics.maxBlueSigils.value, get_current_blue_sigils())
+    statistics.maxCyanSigils.value = Math.max(statistics.maxCyanSigils.value, get_current_cyan_sigils())
+    statistics.maxVioletSigils.value = Math.max(statistics.maxVioletSigils.value, get_current_violet_sigils())
+    statistics.maxPinkSigils.value = Math.max(statistics.maxPinkSigils.value, get_current_pink_sigils())
+    statistics.maxIndigoSigils.value = Math.max(statistics.maxIndigoSigils.value, get_current_indigo_sigils())
 
     // update value of each stat
     for (const stat in statistics) {
