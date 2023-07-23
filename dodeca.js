@@ -471,6 +471,19 @@ function pet_dragon() {
     document.getElementById("dragonPetButton").click();
 }
 
+function buy_sigil_upgrades() {
+    if(!can_buy_max_sigil_upgrades()) {
+        buy_cyan_sigil_upgrades();
+        buy_blue_sigil_upgrades();
+        buy_indigo_sigil_upgrades();
+        buy_violet_sigil_upgrades();
+        buy_pink_sigil_upgrades();
+    }
+    else {
+        buy_max_sigil_upgrades();
+    }
+}
+
 function buy_upgrades() {
     update_statistics()
     unlock_dragon()
@@ -490,11 +503,7 @@ function buy_upgrades() {
     buy_uranium_upgrades();
     buy_magic_upgrades();
     buy_dark_magic_upgrades();
-    buy_cyan_sigil_upgrades();
-    buy_blue_sigil_upgrades();
-    buy_indigo_sigil_upgrades();
-    buy_violet_sigil_upgrades();
-    buy_pink_sigil_upgrades();
+    buy_sigil_upgrades()
     spent_knowledge()
     buy_knowledge_trade();
     buy_tomes_upgrades()
@@ -892,6 +901,22 @@ async function idle_loop(seconds) {
         }
         await delay(ITERATION_SPEED_MS);
     }
+}
+
+function can_buy_max_sigil_upgrades() {
+    const sigilResetAutomation = document.getElementById("sigilResetAutomation");
+    if(sigilResetAutomation === null || sigilResetAutomation.style.display === "none") return false;
+    const button = sigilResetAutomation.nextElementSibling
+    if(button === null || button.disabled) return false;
+}
+
+function buy_max_sigil_upgrades() {
+    const sigilResetAutomation = document.getElementById("sigilResetAutomation");
+    if(sigilResetAutomation === null || sigilResetAutomation.style.display === "none") return;
+    const button = sigilResetAutomation.nextElementSibling
+    if(button === null || button.disabled) return;
+    button.click()
+
 }
 
 function add_setting(settingsModal, setting) {
