@@ -609,7 +609,7 @@ function get_knowledge_cost(level, sigil) {
 }
 
 function get_buy_ratio() {
-    if(gets_automatic_sigils()) return 0.1;
+    if(gets_automatic_sigils()) return 0.9; // We can spent most of our sigils once we get automatic sigils
     return (1 - settings.keep_percent_sigils.value / 100)
 }
 
