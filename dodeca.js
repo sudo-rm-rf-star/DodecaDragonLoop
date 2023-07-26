@@ -9,6 +9,7 @@ const ITERATION_SPEED_MS = 100;
 
 let settings = {
     // setting to reset after X sigils, 0 to disable
+    enabled: {"name": "Enabled", "value": true, "type": "boolean"},
     mine_gold_clicks: {"name": "Mine gold clicks/sec", "value": 1, "type": "number"},
     buy_miners: {"name": "Buy miners", "value": true, "type": "boolean"},
     time_in_challenge: {"name": "Seconds per challenge", "value": 3, "type": "number"},
@@ -38,11 +39,11 @@ let statistics = {
     totalIndigoResets : {"name": "Total indigo resets", "value": 0, "type": "number", "visible": false},
     totalVioletResets : {"name": "Total violet resets", "value": 0, "type": "number", "visible": false},
     totalPinkResets : {"name": "Total pink resets", "value": 0, "type": "number", "visible": false},
-    curCyanSigils : {"name": "Cur cyan sigils", "value": 0, "type": "number", "visible": false},
-    curBlueSigils : {"name": "Cur blue sigils", "value": 0, "type": "number", "visible": false},
-    curIndigoSigils : {"name": "Cur indigo sigils", "value": 0, "type": "number", "visible": false},
-    curVioletSigils : {"name": "Cur violet sigils", "value": 0, "type": "number", "visible": false},
-    curPinkSigils : {"name": "Cur pink sigils", "value": 0, "type": "number", "visible": false},
+    curCyanSigils : {"name": "Cur cyan sigils", "value": 0, "type": "number", "visible": true},
+    curBlueSigils : {"name": "Cur blue sigils", "value": 0, "type": "number", "visible": true},
+    curIndigoSigils : {"name": "Cur indigo sigils", "value": 0, "type": "number", "visible": true},
+    curVioletSigils : {"name": "Cur violet sigils", "value": 0, "type": "number", "visible": true},
+    curPinkSigils : {"name": "Cur pink sigils", "value": 0, "type": "number", "visible": true},
     maxCyanSigils : {"name": "Max cyan sigils", "value": 0, "type": "number", "visible": false},
     maxBlueSigils : {"name": "Max blue sigils", "value": 0, "type": "number", "visible": false},
     maxIndigoSigils : {"name": "Max indigo sigils", "value": 0, "type": "number", "visible": false},
@@ -110,10 +111,17 @@ function get_available_sigils() {
     return available_sigils
 }
 
+
 function gets_automatic_sigils() {
     const achiev = document.getElementById("ach13x0");
     if(achiev === null) return false;
     return document.getElementById("ach13x0").classList.contains("achievementUnlocked");
+}
+
+function gets_automatic_max_tomes() {
+    const achiev = document.getElementById("ach14x1");
+    if(achiev === null) return false;
+    return document.getElementById("ach14x1").classList.contains("achievementUnlocked");
 }
 
 function get_dragon_pet_requirement() {
@@ -320,23 +328,20 @@ function buy_pink_sigil_upgrades() {
 }
 
 function get_current_knowledge() {
-    return parseNumber(document.getElementById("knowledge").innerText);
-}
-
-function get_tome_cost() {
-    return parseNumber(document.getElementById("tomeCost").innerText);
+    return parseExponent(document.getElementById("knowledge").innerText);
 }
 
 function spent_knowledge() {
     if(settings.disable_knowledge_upgrades.value) return;
-    if(can_spend_knowledge(get_tome_cost())) farm_tomes()
+    if(!gets_automatic_max_tomes()) farm_tomes()
     buy_knowledge_upgrades()
 }
 
 function buy_knowledge_upgrades() {
     const buttons = document.getElementsByClassName("knowledgeUpgrade");
 
-    if (!buttons[2].disabled && get_current_knowledge() > 50000) {
+    const cur_knowledge = get_current_knowledge();
+    if (!buttons[2].disabled && cur_knowledge.length === 1 && cur_knowledge[0] > 50000) {
         buttons[2].click()
         return;
     }
@@ -534,7 +539,6 @@ let HARD_CHALLENGE_COMBOS = [
 ]
 
 let challenge_cool_down = [0, 0, 0, 0];
-let reset_cool_down = 5;
 
 function get_score(n) {
     const score = document.getElementById("magicScore" + (n + 1)).innerText.replaceAll(",", "").replaceAll(".", "")
@@ -553,11 +557,6 @@ function get_mine_gold_button() {
 function parseNumber(str) {
     str = str.replaceAll(",", "")
     return parseFloat(str);
-}
-
-function parseNumberRange(str) {
-    // e.g. 42,100 - 126,500
-    return str.split(" - ").map(parseNumber)
 }
 
 function parseExponent(str) {
@@ -601,8 +600,14 @@ const get_current_violet_sigil_power = () => parseNumber(document.getElementById
 const get_current_pink_sigil_power = () => parseNumber(document.getElementById("pinkSigilPower").innerText)
 const get_gold_per_second = () => parseNumber(document.getElementById("goldPerSecond").innerText)
 
+
+function reset_trade_level() {
+    const knowledge_level_input = document.getElementById("knowledgeLevelInput");
+    const reset_knowledge_level = knowledge_level_input.parentElement.nextElementSibling.nextElementSibling.children[0]
+    reset_knowledge_level.click()
+}
+
 function set_trade_level(level) {
- // knowledgeLevelInput, id="knowledgeLevelRange"
     const knowledge_level_input = document.getElementById("knowledgeLevelInput");
     const knowledge_level_range = document.getElementById("knowledgeLevelRange");
     knowledge_level_input.value = level
@@ -612,46 +617,24 @@ function set_trade_level(level) {
 
 }
 
-function get_knowledge_cost(level, sigil) {
-    set_trade_level(level)
-    const sigilIndex = sigils.indexOf(sigil)
-    const knowledge_trade_cost_ranges = document.getElementsByClassName("knowledgeTradeCostRange");
-    const knowledge_trade_cost_range = knowledge_trade_cost_ranges[sigilIndex].innerText.split(" - ");
-    return parseNumber(knowledge_trade_cost_range[1])
-}
-
-function choose_trade_level() {
-    // get max of knowledgeLevelInput
-    const knowledge_level_input = document.getElementById("knowledgeLevelInput");
-    const max_level = knowledge_level_input.max;
-    const min_level = knowledge_level_input.min;
-    const max_cyan_sigils_to_spent = get_current_cyan_sigils()
-    const max_blue_sigils_to_spent = get_current_blue_sigils()
-    const max_indigo_sigils_to_spent = get_current_indigo_sigils()
-    const max_violet_sigils_to_spent = get_current_violet_sigils()
-    const max_pink_sigils_to_spent = get_current_pink_sigils()
-
-    for (let i = max_level; i >= min_level; i--) {
-        set_trade_level(i)
-        const should_choose_level = get_knowledge_cost(i, "cyan") <= max_cyan_sigils_to_spent
-            && get_knowledge_cost(i, "blue") <= max_blue_sigils_to_spent
-            && get_knowledge_cost(i, "indigo") <= max_indigo_sigils_to_spent
-            && get_knowledge_cost(i, "violet") <= max_violet_sigils_to_spent
-            && get_knowledge_cost(i, "pink") <= max_pink_sigils_to_spent
-
-        if(should_choose_level) {
-            return;
-        }
-    }
+let tradeLevel = 1;
+reset_trade_level()
+function increment_trade_level() {
+    tradeLevel++;
+    set_trade_level(tradeLevel)
 }
 
 function buy_knowledge_trade() {
     const knowledge_trades = document.getElementsByClassName("knowledgeTradeDiv");
     for (let i = knowledge_trades.length - 1; i >= 0; i--) {
         const knowledge_trade = knowledge_trades[i];
+        const before_trade = knowledge_trade.innerHTML
         if(can_spend_sigils()) {
-            choose_trade_level()
             knowledge_trade.getElementsByTagName("button")[0].click();
+            const after_trade = knowledge_trade.innerHTML
+            if(before_trade !== after_trade) {
+                increment_trade_level()
+            }
         }
     }
 }
@@ -669,11 +652,6 @@ function can_spend_sigils() {
 }
 
 let lastCurrentKnowledge = 0;
-function can_spend_knowledge(knowledge_cost) {
-    const growth_rate = settings.growth_rate_knowledge.value / 100
-    return growth_rate * lastCurrentKnowledge < get_current_knowledge() - knowledge_cost;
-}
-
 
 const mine_gold_button = get_mine_gold_button()
 
@@ -1230,12 +1208,13 @@ async function farm_blood() {
 }
 
 async function game_loop() {
-    await mine_starting_gold()
-    await do_challenges() // do 5 challenge loops, 75 seconds in total
-    await farm_blood() // 30 seconds + 3 seconds for each level attempted
-    await idle_loop(5)
-    spend_time_with_dragon()
-    setTimeout(game_loop, 1000);
+    while(settings.enabled.value) {
+        await mine_starting_gold()
+        await do_challenges() // do 5 challenge loops, 75 seconds in total
+        await farm_blood() // 30 seconds + 3 seconds for each level attempted
+        await idle_loop(5)
+        spend_time_with_dragon()
+    }
 }
 
 // start the game loop
