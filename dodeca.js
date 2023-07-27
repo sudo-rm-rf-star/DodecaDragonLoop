@@ -168,6 +168,7 @@ function get_new_sigil_after(sigil) {
     return 50;
 }
 
+let currentHedronRotation = 0
 let currentSigilRotation = 0
 // 5 seconds every 60 seconds
 let tryToPushGoldAt = Date.now()
@@ -201,7 +202,8 @@ function itemToReset() {
 
     if (choose_octahedron() && !settings.disable_octahedron_reset.value) return "holyOctahedrons"
     if (choose_tetrahedron() && !settings.disable_tetrahedron_reset.value) return "holyTetrahedrons"
-    return choose_sigil(available_sigils) + "Sigils";
+    const sigil = choose_sigil(available_sigils);
+    if(!pushHedrons && !!sigil) return sigil + "Sigils";
 }
 
 function unlocked_holyTetrahedrons() {
@@ -212,42 +214,60 @@ function unlocked_octaHedrons() {
     return getElementById("tab_holyOctahedrons").style.display !== "none";
 }
 
-const tetraHedronResetAfterPerUpgrade = [
-    1,
-    1, 1, 1,
-    1, 1, 1,
-    1, 1,
-    4,
-    20,
-    31,
-    31
+const pushFromTetrahedron = [
+    [29, 30],
+    [29, 30], [29, 30], [29, 30],
+    [29, 30], [29, 30], [29, 30],
+    [29, 30], [29, 30],
+    [40, 45],
+    [50, 55],
+    [60, 80],
+    [80, 90]
 ]
-const tetraHedronToGetCostExponent = {1: 30, 2: 36, 3: 39, 4: 42, 5: 43, 6: 45, 7: 46, 8: 48, 10: 52, 20: 56, 31: 60}
 
+let pushHedrons = true
 function choose_tetrahedron() {
     if (!unlocked_holyTetrahedrons()) return false
     const curGold = parseExponent(get_current_gold())
-    const nextReset = tetraHedronResetAfterPerUpgrade[tetrahedronUpgradeCount]
-    const pushFrom = tetraHedronToGetCostExponent[nextReset]
-    return curGold.length === 3 && curGold[2] >= pushFrom
+    const [pushFrom, pushTo] = pushFromTetrahedron.length < tetrahedronUpgradeCount ? pushFromTetrahedron[tetrahedronUpgradeCount] : [60, 80]
+    if(curGold.length === 3 && curGold[2] >= pushTo) {
+        pushHedrons = false;
+        return currentHedronRotation % 2 === 0 && rotateHedrons;
+    }
+
+    if(curGold.length === 3 && curGold[2] >= pushFrom) {
+        pushHedrons = true;
+        return false;
+    }
+
+    return false;
 }
 
 const octaHedronResetAfterPerUpgrade = [
-    1,
-    1, 1,
-    1, 1, 1,
-    1,
-    1,
-    1
+    [59, 60],
+    [59, 60], [59, 60],
+    [59, 60], [59, 60], [59, 60],
+    [59, 60],
+    [60, 83],
+    [80, 90]
 ]
-const octaHedronToGetCostExponent = {1: 60}
-
+let rotateHedrons = false;
 function choose_octahedron() {
     if (!unlocked_octaHedrons()) return false
     const curGold = parseExponent(get_current_gold())
-    const nextReset = octaHedronResetAfterPerUpgrade[octaHedronUpgradeCount]
-    const pushFrom = octaHedronToGetCostExponent[nextReset]
-    return curGold.length === 3 && curGold[2] >= pushFrom
+    if(octaHedronUpgradeCount >= 7) rotateHedrons = true;
+    const [pushFrom, pushTo] = octaHedronResetAfterPerUpgrade[octaHedronUpgradeCount]
+    if(curGold.length === 3 && curGold[2] >= pushTo) {
+        pushHedrons = false;
+        return currentHedronRotation % 2 === 1 && rotateHedrons;
+    }
+
+    if(curGold.length === 3 && curGold[2] >= pushFrom) {
+        pushHedrons = true;
+        return false;
+    }
+
+    return false;
 }
 
 function choose_sigil(available_sigils) {
@@ -368,11 +388,47 @@ function buy_octa_hedron_upgrades() {
     }
 }
 
+function get_current_holyfire() {
+    return parseNumber(getElementById("holyFire").innerText)
+}
+
 let lastClickHolyFireUpgrade = Date.now()
-let maxHolyFireButton = getElementsByClassName("holyFireBuyMaxButton")[0]
 function buy_holyfire_upgrades() {
     if(lastClickHolyFireUpgrade + 1000 > Date.now()) return;
-    maxHolyFireButton.click();
+    lastClickHolyFireUpgrade = Date.now()
+    const currentHolyFire = get_current_holyfire()
+    const unlockedVoidMagic = unlocked_void_magic()
+    if(currentHolyFire > 1e8 && !unlockedVoidMagic) {
+        tryToPushGoldAt = Date.now()
+        tryToPushGoldUntil = Date.now() + 5000
+    }
+
+    if(currentHolyFire > 1e7 && !unlockedVoidMagic) return;
+    // holyFireUpgrade
+    const buttons = getElementsByClassName("holyFireUpgrade");
+    for (let i = 0; i < buttons.length; i++) {
+        let button = buttons[i]
+        if (!button.disabled) {
+            button.click();
+            return;
+        }
+    }
+}
+
+
+// voidMagicUpgrade
+let lastClickVoidMagicUpgrade = Date.now()
+function buy_void_magic_upgrades() {
+    if(lastClickVoidMagicUpgrade + 1000 < Date.now()) return;
+    lastClickVoidMagicUpgrade = Date.now()
+    const buttons = getElementsByClassName("voidMagicUpgrade");
+    for (let i = 0; i < buttons.length; i++) {
+        let button = buttons[i]
+        if (!button.disabled) {
+            button.click();
+            return;
+        }
+    }
 }
 
 function get_upgrade_cost(button) {
@@ -509,15 +565,16 @@ function reset_progress_for_magic() {
 
     if (should_reset) {
         getElementById("magicToGet").parentElement.click();
-        post_reset()
+        post_reset("magic")
         statistics.totalMagicResets.value += 1;
     }
 }
 
-function post_reset() {
+function post_reset(resetItem) {
     statistics.timeForLastReset.value = Math.floor((Date.now() - statistics.lastResetTime.value) / 1000)
     statistics.lastResetTime.value = new Date().getTime();
-    currentSigilRotation++
+    if(resetItem.includes("sigil")) currentSigilRotation += 1;
+    if(resetItem.includes("hedron")) currentHedronRotation++;
 }
 
 function get_dragon_cooldown() {
@@ -543,7 +600,7 @@ function resetProgress() {
     const itemCount = parseNumber(toGetElement.innerText);
     if (itemCount >= resetAfter) {
         toGetElement.parentElement.click();
-        post_reset()
+        post_reset(resetItem)
         statistics.lastReset.value = resetItem;
     }
 }
@@ -610,6 +667,8 @@ function buy_upgrades() {
     buy_holy_tetrahedron_upgrades()
     buy_octa_hedron_upgrades()
     buy_holyfire_upgrades()
+    unlock_void_magic()
+    buy_void_magic_upgrades()
 }
 
 let EASY_CHALLENGE_COMBOS = [
@@ -886,7 +945,7 @@ function enterHell(level) {
     const enterHellButton = getElementById("enterHellButton");
     if (enterHellButton.innerText === "Exit hell") return;
     enterHellButton.click();
-    post_reset()
+    post_reset("hell")
 }
 
 function exitHell() {
@@ -916,6 +975,11 @@ function unlocked_challenges() {
     // check if tab_magicChallenges has display none
     const tab_magicChallenges = getElementById("tab_magicChallenges");
     return tab_magicChallenges.style.display !== "none";
+}
+
+function unlocked_void_magic() {
+    const tab_voidMagic = getElementById("tab_voidMagic");
+    return tab_voidMagic.style.display !== "none";
 }
 
 function should_do_challenge(score_before, score_after) {
@@ -1272,6 +1336,13 @@ function get_blood_per_seconds() {
 
 function get_current_blood() {
     return parseNumber(getElementById('blood').innerText)
+}
+
+function unlock_void_magic() {
+    // unlockVoidMagicUpgradesButton
+    const unlockVoidMagicButton = getElementById('unlockVoidMagicUpgradesButton')
+    if(unlockVoidMagicButton.style.display === 'none') return
+    unlockVoidMagicButton.click()
 }
 
 const optimizeHellCooldown = 1000 * 60;
