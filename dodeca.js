@@ -159,13 +159,21 @@ function itemToReset() {
         }
     }
 
-    const unlocked_holyTetrahedrons = has_unlocked_holyTetrahedrons()
-    if(unlocked_holyTetrahedrons) return "holyTetrahedrons"
+    if(choose_tetrahedron()) return "holyTetrahedrons"
     return choose_sigil(available_sigils) + "Sigils";
 }
 
-function has_unlocked_holyTetrahedrons() {
+function unlocked_holyTetrahedrons() {
     return document.getElementById("tab_holyTetrahedrons").style.display !== "none";
+}
+
+function choose_tetrahedron() {
+    if(!unlocked_holyTetrahedrons()) return false
+
+    const cur_gold = parseExponent(get_current_gold())
+    if(cur_gold.length < 3) return false
+
+    if(cur_gold[2] > 30) return true
 }
 
 function choose_sigil(available_sigils) {
@@ -178,8 +186,13 @@ function choose_sigil(available_sigils) {
     const dragon_pet_requirement = get_dragon_pet_requirement();
     if (!!dragon_pet_requirement && available_sigils[0] !== dragon_pet_requirement) return dragon_pet_requirement;
 
-    const should_push_sigil = get_new_sigil_after(available_sigils[1]) < get_sigil_count(available_sigils[1])
-    if (should_push_sigil) return available_sigils[0];
+    // if there's an avaible sigil that is 0, push it or push the sigil before it
+    const firstSigilWith0Count = sigils.find(sigil => get_sigil_count(sigil) === 0)
+    const sigilBeforeFirstSigilWith0Count = sigils[sigils.indexOf(firstSigilWith0Count) - 1]
+    const should_push_sigil = get_new_sigil_after(sigilBeforeFirstSigilWith0Count) < get_sigil_count(sigilBeforeFirstSigilWith0Count)
+    if (should_push_sigil) return firstSigilWith0Count;
+    if (!!firstSigilWith0Count) return sigilBeforeFirstSigilWith0Count
+
     const nextSigilIndex = currentSigilRotation % available_sigils.length;
     if (nextSigilIndex === 0) currentSigilRotation++;
     return available_sigils[currentSigilRotation % available_sigils.length];
