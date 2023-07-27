@@ -6,7 +6,7 @@ const settingsKey = "dodeca_settings";
 const statisticsKey = "dodeca_statistics";
 const sigils = ["cyan", "blue", "indigo", "violet", "pink", "red", "orange", "yellow"];
 const cyan_to_pink_sigils = ["cyan", "blue", "indigo", "violet", "pink"];
-const ITERATION_SPEED_MS = 100;
+const ITERATION_SPEED_MS = 200;
 
 let settings = {
     // setting to reset after X sigils, 0 to disable
@@ -21,6 +21,8 @@ let settings = {
     spend_knowledge_divider_exponent: {"name": "Spend knowledge divider exponent", "value": 2, "type": "number"},
     disable_hell: {"name": "Disable hell", "value": false, "type": "boolean"},
     disable_reset: {"name": "Disable reset", "value": false, "type": "boolean"},
+    disable_tetrahedron_reset: {"name": "Disable tetrahedron reset", "value": false, "type": "boolean"},
+    disable_octahedron_reset: {"name": "Disable octahedron reset", "value": false, "type": "boolean"},
 
 }
 
@@ -33,22 +35,6 @@ let statistics = {
     lastReset: {"name": "Sigil last reset", "value": "none", "type": "string"},
     nextReset: {"name": "Sigil next reset", "value": "none", "type": "string"},
     totalMagicResets: {"name": "Total magic resets", "value": 0, "type": "number", "visible": false},
-    curCyanSigils: {"name": "Cur cyan sigils", "value": 0, "type": "number", "visible": true},
-    curBlueSigils: {"name": "Cur blue sigils", "value": 0, "type": "number", "visible": true},
-    curIndigoSigils: {"name": "Cur indigo sigils", "value": 0, "type": "number", "visible": true},
-    curVioletSigils: {"name": "Cur violet sigils", "value": 0, "type": "number", "visible": true},
-    curPinkSigils: {"name": "Cur pink sigils", "value": 0, "type": "number", "visible": true},
-    curRedSigils: {"name": "Cur red sigils", "value": 0, "type": "number", "visible": true},
-    curOrangeSigils: {"name": "Cur orange sigils", "value": 0, "type": "number", "visible": true},
-    curYellowSigils: {"name": "Cur yellow sigils", "value": 0, "type": "number", "visible": true},
-    maxCyanSigils: {"name": "Max cyan sigils", "value": 0, "type": "number", "visible": false},
-    maxBlueSigils: {"name": "Max blue sigils", "value": 0, "type": "number", "visible": false},
-    maxIndigoSigils: {"name": "Max indigo sigils", "value": 0, "type": "number", "visible": false},
-    maxVioletSigils: {"name": "Max violet sigils", "value": 0, "type": "number", "visible": false},
-    maxPinkSigils: {"name": "Max pink sigils", "value": 0, "type": "number", "visible": false},
-    maxRedSigils: {"name": "Max red sigils", "value": 0, "type": "number", "visible": false},
-    maxOrangeSigils: {"name": "Max orange sigils", "value": 0, "type": "number", "visible": false},
-    maxYellowSigils: {"name": "Max yellow sigils", "value": 0, "type": "number", "visible": false},
     optimizedHellLevel: {"name": "Optimized hell level", "value": 0, "type": "number", "visible": false},
     optimizedHellLevelAt: {"name": "Optimized hell level at", "value": 0, "type": "number", "visible": false},
 }
@@ -83,23 +69,57 @@ for (let statistic in cached_statistics) {
 
 localStorage.setItem(settingsKey, JSON.stringify(settings));
 
+const dataCache = {}
+
+function getCachedData(key, fn) {
+    if (dataCache[key] === undefined || dataCache[key].time < Date.now() - 1000) {
+        dataCache[key] = {
+            value: fn(),
+            time: Date.now()
+        }
+    }
+
+    return dataCache[key].value
+}
+
+const elementsCache = {};
+
+function getElementById(id) {
+    if (elementsCache[id] === undefined) {
+        elementsCache[id] = document.getElementById(id);
+    }
+
+    return elementsCache[id];
+}
+
+function getElementsByClassName(className) {
+    if (elementsCache[className] === undefined) {
+        elementsCache[className] = document.getElementsByClassName(className);
+    }
+
+    return elementsCache[className];
+}
+
+
 
 function is_sigil_available(sigil) {
-    return document.getElementById(`tab_${sigil}Sigils`).style.display !== "none"
+    return getElementById(`tab_${sigil}Sigils`).style.display !== "none"
 }
 
 function get_sigil_count(sigil) {
-    return parseNumber(document.getElementById(`${sigil}Sigils`).innerText);
+    const sigilCountElement = getElementById(`${sigil}Sigils`);
+    if (sigilCountElement === null) return 0;
+    return parseNumber(sigilCountElement.innerText);
 }
 
 function get_sigil_power(sigil) {
-    return parseNumber(document.getElementById(`${sigil}SigilPower`).innerText);
+    return parseNumber(getElementById(`${sigil}SigilPower`).innerText);
 }
 
 function available_sigils_to_reset() {
     // for each sigil in sigils, check if sigil is available, start with last sigil
     let available_sigils = [];
-    for (let i = sigils.length - 1; i >= 0; i--) {
+    for (let i = 0; i < sigils.length; i++) {
         // don't reset cyan to pink sigils if automatic sigils is enabled
         if (gets_automatic_sigils() && cyan_to_pink_sigils.includes(sigils[i])) continue;
         if (is_sigil_available(sigils[i])) {
@@ -110,11 +130,20 @@ function available_sigils_to_reset() {
     return available_sigils
 }
 
+let achievementList = []
+
 function has_achievement(id) {
-    const achievement = document.getElementById(id);
-    return achievement !== null && achievement.classList.contains("achievementUnlocked");
+    let hasAchievement = achievementList.includes(id);
+    if (!hasAchievement) {
+        const achievement = getElementById(id);
+        hasAchievement = achievement !== null && achievement.classList.contains("achievementUnlocked");
+        if (hasAchievement) achievementList.push(id);
+    }
+
+    return hasAchievement
 }
 
+const gets_automatic_fire_upgrades = () => has_achievement("ach6x2");
 const gets_automatic_sigils = () => has_achievement("ach13x0");
 const gets_automatic_uranium = () => has_achievement("ach5x3");
 const gets_automatic_max_tomes = () => has_achievement("ach14x1");
@@ -124,13 +153,14 @@ const has_automatic_max_all_blue_fire = () => has_achievement("ach13x4");
 const gets_automatic_magic = () => has_achievement("ach3x4");
 const gets_automatic_challenge_rating = () => has_achievement("ach7x1");
 const gets_automatic_plutonium = () => has_achievement("ach15x3");
+const gets_automatic_sigil_upgrades = () => has_achievement("ach20x0");
 
 function get_dragon_pet_requirement() {
-    const dragonPetStuff = document.getElementById("dragonPetStuff");
+    const dragonPetStuff = getElementById("dragonPetStuff");
     if (dragonPetStuff === null) return null;
     if (dragonPetStuff.style.display === "none") return null;
     if (dragonPetStuff.innerText.includes("You have petted your dragon sufficiently.")) return null;
-    return document.getElementById("dragonPetRequirement").innerText
+    return getElementById("dragonPetRequirement").innerText
 }
 
 function get_new_sigil_after(sigil) {
@@ -140,8 +170,25 @@ function get_new_sigil_after(sigil) {
 
 let currentSigilRotation = 0
 // 5 seconds every 60 seconds
-let dontResetForBlueFireAt = Date.now() + 5000
-let dontResetForBlueFireUntil = Date.now()  + 10000
+let tryToPushGoldAt = Date.now()
+let tryToPushGoldUntil = Date.now()
+
+function shouldTryToPushGold() {
+    // give breathing room to push gold
+    if (Date.now() > tryToPushGoldAt && Date.now() < tryToPushGoldUntil) {
+        if (inHell) {
+            tryToPushGoldAt += 5000
+            tryToPushGoldUntil += 5000
+        } else {
+            return true;
+        }
+    }
+    if (Date.now() > tryToPushGoldUntil) {
+        tryToPushGoldAt = Date.now() + 60000
+        tryToPushGoldUntil = Date.now() + 70000
+    }
+    return false;
+}
 
 function itemToReset() {
     const available_sigils = available_sigils_to_reset();
@@ -149,31 +196,58 @@ function itemToReset() {
     // don't reset yet
     if (available_sigils.length === 0) return;
     if (statistics.timeSinceLastReset.value < settings.reset_cooldown.value) return;
+    if (shouldTryToPushGold()) return;
 
-    const unlocked_red = available_sigils.includes("red")
-    if (unlocked_red) {
-        if (Date.now() > dontResetForBlueFireAt && Date.now() < dontResetForBlueFireUntil) return;
-        if (Date.now() > dontResetForBlueFireUntil) {
-            dontResetForBlueFireAt = Date.now() + 60000
-            dontResetForBlueFireUntil = Date.now() + 65000
-        }
-    }
 
-    if(choose_tetrahedron()) return "holyTetrahedrons"
+    if (choose_octahedron() && !settings.disable_octahedron_reset.value) return "holyOctahedrons"
+    if (choose_tetrahedron() && !settings.disable_tetrahedron_reset.value) return "holyTetrahedrons"
     return choose_sigil(available_sigils) + "Sigils";
 }
 
 function unlocked_holyTetrahedrons() {
-    return document.getElementById("tab_holyTetrahedrons").style.display !== "none";
+    return getElementById("tab_holyTetrahedrons").style.display !== "none";
 }
 
+function unlocked_octaHedrons() {
+    return getElementById("tab_holyOctahedrons").style.display !== "none";
+}
+
+const tetraHedronResetAfterPerUpgrade = [
+    1,
+    1, 1, 1,
+    1, 1, 1,
+    1, 1,
+    4,
+    20,
+    31,
+    31
+]
+const tetraHedronToGetCostExponent = {1: 30, 2: 36, 3: 39, 4: 42, 5: 43, 6: 45, 7: 46, 8: 48, 10: 52, 20: 56, 31: 60}
+
 function choose_tetrahedron() {
-    if(!unlocked_holyTetrahedrons()) return false
+    if (!unlocked_holyTetrahedrons()) return false
+    const curGold = parseExponent(get_current_gold())
+    const nextReset = tetraHedronResetAfterPerUpgrade[tetrahedronUpgradeCount]
+    const pushFrom = tetraHedronToGetCostExponent[nextReset]
+    return curGold.length === 3 && curGold[2] >= pushFrom
+}
 
-    const cur_gold = parseExponent(get_current_gold())
-    if(cur_gold.length < 3) return false
+const octaHedronResetAfterPerUpgrade = [
+    1,
+    1, 1,
+    1, 1, 1,
+    1,
+    1,
+    1
+]
+const octaHedronToGetCostExponent = {1: 60}
 
-    if(cur_gold[2] > 30) return true
+function choose_octahedron() {
+    if (!unlocked_octaHedrons()) return false
+    const curGold = parseExponent(get_current_gold())
+    const nextReset = octaHedronResetAfterPerUpgrade[octaHedronUpgradeCount]
+    const pushFrom = octaHedronToGetCostExponent[nextReset]
+    return curGold.length === 3 && curGold[2] >= pushFrom
 }
 
 function choose_sigil(available_sigils) {
@@ -181,7 +255,7 @@ function choose_sigil(available_sigils) {
     if (gets_automatic_sigils() && !unlocked_red) return;
     if (available_sigils.length === 1) return available_sigils[0];
     if (get_sigil_count("pink") > 0 && !unlocked_red) return available_sigils[currentSigilRotation % available_sigils.length];
-    if (get_sigil_power("yellow") > 4000) return available_sigils[currentSigilRotation % available_sigils.length];
+    if (get_sigil_count("yellow") > 1) return available_sigils[currentSigilRotation % available_sigils.length];
 
     const dragon_pet_requirement = get_dragon_pet_requirement();
     if (!!dragon_pet_requirement && available_sigils[0] !== dragon_pet_requirement) return dragon_pet_requirement;
@@ -191,7 +265,9 @@ function choose_sigil(available_sigils) {
     const sigilBeforeFirstSigilWith0Count = sigils[sigils.indexOf(firstSigilWith0Count) - 1]
     const should_push_sigil = get_new_sigil_after(sigilBeforeFirstSigilWith0Count) < get_sigil_count(sigilBeforeFirstSigilWith0Count)
     if (should_push_sigil) return firstSigilWith0Count;
-    if (!!firstSigilWith0Count) return sigilBeforeFirstSigilWith0Count
+    if (!should_push_sigil && firstSigilWith0Count !== undefined) {
+        available_sigils = available_sigils.slice(0, available_sigils.indexOf(firstSigilWith0Count))
+    }
 
     const nextSigilIndex = currentSigilRotation % available_sigils.length;
     if (nextSigilIndex === 0) currentSigilRotation++;
@@ -203,20 +279,22 @@ function delay(time) {
 }
 
 function is_auto_mine_enabled() {
-    return document.getElementById("minerAutoBuyMaxButton").innerText === "Auto max all: On";
+    return getElementById("minerAutoBuyMaxButton").innerText === "Auto max all: On";
 }
 
 function buy_fire_upgrades() {
+    if (gets_automatic_fire_upgrades()) return
     // click on the buy all button with ID "BuyAllFireButton"
-    document.getElementById("fireMaxAllButton").click();
+    getElementById("fireMaxAllButton").click();
 }
 
+let lastClickedPlatinumUpgrade = Date.now()
 function buy_platinum_upgrades() {
-    const buttons = document.getElementsByClassName("platinumUpgrade");
+    if(lastClickedPlatinumUpgrade + 1000 > Date.now()) return;
+    lastClickedPlatinumUpgrade = Date.now()
+    const buttons = getElementsByClassName("platinumUpgrade");
     if (!buttons[4].disabled) {
-        // Convert platinum: click on platinumConvertButton
-        document.getElementById("platinumConvertButton").click();
-        // Focus on the 5th platinum upgrade
+        getElementById("platinumConvertButton").click();
         buttons[4].click()
         return;
     }
@@ -226,20 +304,20 @@ function buy_platinum_upgrades() {
         return;
     }
 
-    document.getElementById("platinumMaxAllButton").click();
+    getElementById("platinumMaxAllButton").click();
 }
 
 function farm_plutonium() {
-    if(gets_automatic_plutonium()) return
-    if (document.getElementById("plutoniumConvertButton").disabled) return;
-    document.getElementById("plutoniumConvertButton").click();
+    if (gets_automatic_plutonium()) return
+    if (getElementById("plutoniumConvertButton").disabled) return;
+    getElementById("plutoniumConvertButton").click();
 }
 
 const plutonium_upgrade_order = [2, 1, 0, 3, 4]
 
 function buy_plutonium_upgrades() {
     // plutoniumUpgrade
-    const buttons = document.getElementsByClassName("plutoniumUpgrade");
+    const buttons = getElementsByClassName("plutoniumUpgrade");
     for (let i = 0; i < plutonium_upgrade_order.length; i++) {
         if (!buttons[plutonium_upgrade_order[i]].disabled) {
             buttons[plutonium_upgrade_order[i]].click();
@@ -249,27 +327,77 @@ function buy_plutonium_upgrades() {
 }
 
 // holyTetrahedronUpgrade
+let firstTetrahedronUpgradeCost = 1;
+let tetrahedronUpgradeCount = 0;
+let lastClickedTetrahedronUpgrade = Date.now()
 function buy_holy_tetrahedron_upgrades() {
-    const buttons = document.getElementsByClassName("holyTetrahedronUpgrade");
+    if(lastClickedTetrahedronUpgrade + 1000 > Date.now()) return;
+    lastClickedTetrahedronUpgrade = Date.now()
+    const buttons = getElementsByClassName("holyTetrahedronUpgrade");
+    tetrahedronUpgradeCount = 0;
     for (let i = 0; i < buttons.length; i++) {
-        if (!buttons[i].disabled) {
-            buttons[i].click();
+        let button = buttons[i]
+        if (!button.disabled) {
+            firstTetrahedronUpgradeCost = get_upgrade_cost(button)
+            button.click();
             return;
+        } else {
+            tetrahedronUpgradeCount++;
         }
     }
 }
 
+
+// octaHedron
+let firstOctaHedronUpgradeCost = 1;
+let octaHedronUpgradeCount = 0;
+let lastClickedOctaHedronUpgrade = Date.now()
+function buy_octa_hedron_upgrades() {
+    if(lastClickedOctaHedronUpgrade + 1000 > Date.now()) return;
+    const buttons = getElementsByClassName("holyOctahedronUpgrade");
+    octaHedronUpgradeCount = 0;
+    for (let i = 0; i < buttons.length; i++) {
+        let button = buttons[i]
+        if (!button.disabled) {
+            firstOctaHedronUpgradeCost = get_upgrade_cost(button)
+            button.click();
+            return;
+        } else {
+            octaHedronUpgradeCount++;
+        }
+    }
+}
+
+let lastClickHolyFireUpgrade = Date.now()
+let maxHolyFireButton = getElementsByClassName("holyFireBuyMaxButton")[0]
+function buy_holyfire_upgrades() {
+    if(lastClickHolyFireUpgrade + 1000 > Date.now()) return;
+    maxHolyFireButton.click();
+}
+
+function get_upgrade_cost(button) {
+    return getCachedData(button.innerText, () => {
+        const buttonParts = button.innerText.split("\n")
+        const buttonPart = buttonParts.find((part) => part.includes("Cost"))
+        return parseNumber(buttonPart.split(" ")[1])
+    })
+}
+
+
 function farm_uranium() {
     if (gets_automatic_uranium()) return
-    document.getElementById("uraniumConvertButton").click();
+    getElementById("uraniumConvertButton").click();
 }
 
 function farm_tomes() {
-    document.getElementById("tomeCost").parentElement.click();
+    getElementById("tomeCost").parentElement.click();
 }
 
+let lastClickedUraniumUpgrade = Date.now()
 function buy_uranium_upgrades() {
-    const buttons = document.getElementsByClassName("uraniumUpgrade");
+    if(lastClickedUraniumUpgrade + 1000 > Date.now()) return;
+    lastClickedUraniumUpgrade = Date.now()
+    const buttons = getElementsByClassName("uraniumUpgrade");
     if (!buttons[2].disabled) {
         buttons[2].click()
         return;
@@ -295,12 +423,12 @@ function buy_uranium_upgrades() {
         return;
     }
 
-    document.getElementById("uraniumMaxAllButton").click();
+    getElementById("uraniumMaxAllButton").click();
 }
 
 // buy magic upgrades with class "magicUpgrade"
 function buy_magic_upgrades() {
-    const buttons = document.getElementsByClassName("magicUpgrade");
+    const buttons = getElementsByClassName("magicUpgrade");
     for (let i = 0; i < buttons.length; i++) {
         buttons[i].click();
     }
@@ -309,7 +437,7 @@ function buy_magic_upgrades() {
 const magicCosts = [2, 3, 8, 12, 30, 100, 300, 1500, 4000, 20000, 100000, 400000]
 
 function next_magic_cost() {
-    const buttons = document.getElementsByClassName("magicUpgrade");
+    const buttons = getElementsByClassName("magicUpgrade");
     for (let i = 0; i < buttons.length; i++) {
         if (!buttons[i].disabled) {
             return magicCosts[i];
@@ -318,14 +446,14 @@ function next_magic_cost() {
 }
 
 function buy_dark_magic_upgrades() {
-    const buttons = document.getElementsByClassName("darkMagicUpgrade");
+    const buttons = getElementsByClassName("darkMagicUpgrade");
     for (let i = 0; i < buttons.length; i++) {
         buttons[i].click();
     }
 }
 
 function get_current_knowledge() {
-    return parseNumber(document.getElementById("knowledge").innerText);
+    return parseNumber(getElementById("knowledge").innerText);
 }
 
 function spent_knowledge() {
@@ -334,7 +462,7 @@ function spent_knowledge() {
 }
 
 function buy_knowledge_upgrades() {
-    const buttons = document.getElementsByClassName("knowledgeUpgrade");
+    const buttons = getElementsByClassName("knowledgeUpgrade");
 
     const cur_knowledge = get_current_knowledge();
     if (!buttons[2].disabled && cur_knowledge.length === 1 && cur_knowledge[0] > 50000) {
@@ -344,7 +472,7 @@ function buy_knowledge_upgrades() {
 
     for (let i = 0; i < buttons.length; i++) {
         if (i === 2) continue;
-        const cost = parseNumber(document.getElementById(`knowledgeUpgrade${i + 1}Cost`).innerText);
+        const cost = parseNumber(getElementById(`knowledgeUpgrade${i + 1}Cost`).innerText);
         const knowledge_divider = 10 ** settings.spend_knowledge_divider_exponent.value;
         const max_spent_knowledge = get_current_knowledge() / knowledge_divider
         if (cost < max_spent_knowledge) buttons[i].click();
@@ -353,7 +481,7 @@ function buy_knowledge_upgrades() {
 }
 
 function buy_tomes_upgrades() {
-    const buttons = document.getElementsByClassName("tomeUpgrade");
+    const buttons = getElementsByClassName("tomeUpgrade");
     for (let i = 0; i < buttons.length; i++) {
         buttons[i].click();
     }
@@ -361,7 +489,7 @@ function buy_tomes_upgrades() {
 
 function buy_blue_fire_upgrades() {
     if (has_automatic_max_all_blue_fire()) return;
-    const buttons = document.getElementsByClassName("blueFireUpgrade");
+    const buttons = getElementsByClassName("blueFireUpgrade");
     for (let i = 0; i < buttons.length; i++) {
         buttons[i].click();
     }
@@ -369,7 +497,7 @@ function buy_blue_fire_upgrades() {
 
 function reset_progress_for_magic() {
     const reset_magic_after = settings.reset_magic_after.value
-    const magic_to_get = parseNumber(document.getElementById("magicToGet").innerText);
+    const magic_to_get = parseNumber(getElementById("magicToGet").innerText);
 
     let should_reset = reset_magic_after !== 0 && magic_to_get >= reset_magic_after
 
@@ -380,7 +508,7 @@ function reset_progress_for_magic() {
     should_reset |= !gets_automatic_magic() && reset_magic_after === 0 && magic_to_get > get_current_magic() * 2
 
     if (should_reset) {
-        document.getElementById("magicToGet").parentElement.click();
+        getElementById("magicToGet").parentElement.click();
         post_reset()
         statistics.totalMagicResets.value += 1;
     }
@@ -394,25 +522,24 @@ function post_reset() {
 
 function get_dragon_cooldown() {
     // dragonTimeCooldown
-    return parseNumber(document.getElementById("dragonTimeCooldown").innerText);
+    return parseNumber(getElementById("dragonTimeCooldown").innerText);
 }
 
 function spend_time_with_dragon() {
     // click on dragonSpendTimeButton
-    document.getElementById("dragonSpendTimeButton").click();
+    getElementById("dragonSpendTimeButton").click();
 }
-
 
 
 function resetProgress() {
     const resetItem = statistics.nextReset.value
     const resetAfter = settings.resetAfter.value
     const disableReset = settings.disable_reset.value
-    if(resetAfter === 0 || disableReset) return;
+    if (resetAfter === 0 || disableReset) return;
 
 
-    const toGetElement = document.getElementById(resetItem + "ToGet")
-    if(toGetElement === null) return;
+    const toGetElement = getElementById(resetItem + "ToGet")
+    if (toGetElement === null) return;
     const itemCount = parseNumber(toGetElement.innerText);
     if (itemCount >= resetAfter) {
         toGetElement.parentElement.click();
@@ -426,20 +553,22 @@ function buy_dragon_feed() {
     if (dragon_feed_requirement === null) return;
     const cur_sigils = get_sigil_count(dragon_feed_requirement)
     if (cur_sigils < 500) return;
-    document.getElementById("dragonFeedButton").click();
+    getElementById("dragonFeedButton").click();
 }
 
 function pet_dragon() {
-    const dragon_pet_button = document.getElementById("dragonPetButton")
+    const dragon_pet_button = getElementById("dragonPetButton")
     if (dragon_pet_button.disabled) return;
-    document.getElementById("dragonPetButton").click();
+    getElementById("dragonPetButton").click();
 }
 
 
 function buy_sigil_upgrades() {
-    for(let i = 0; i < sigils.length; i++) {
+    if (gets_automatic_sigil_upgrades()) return;
+
+    for (let i = 0; i < sigils.length; i++) {
         const sigil = sigils[i]
-        const buttons = document.getElementsByClassName(sigil + "SigilUpgrade");
+        const buttons = getElementsByClassName(sigil + "SigilUpgrade");
         for (let i = 0; i < buttons.length; i++) {
             buttons[i].click();
         }
@@ -479,6 +608,8 @@ function buy_upgrades() {
     farm_plutonium()
     buy_plutonium_upgrades()
     buy_holy_tetrahedron_upgrades()
+    buy_octa_hedron_upgrades()
+    buy_holyfire_upgrades()
 }
 
 let EASY_CHALLENGE_COMBOS = [
@@ -492,7 +623,7 @@ let HARD_CHALLENGE_COMBOS = [
 let challenge_cool_down = [0, 0, 0, 0];
 
 function get_score(n) {
-    const score = document.getElementById("magicScore" + (n + 1)).innerText.replaceAll(",", "").replaceAll(".", "")
+    const score = getElementById("magicScore" + (n + 1)).innerText.replaceAll(",", "").replaceAll(".", "")
     return parseFloat(score);
 }
 
@@ -528,19 +659,19 @@ function compareExponent(a, b) {
 }
 
 function get_current_gold() {
-    return document.getElementById("gold").innerText
+    return getElementById("gold").innerText
 }
 
 function get_current_magic() {
-    return parseNumber(document.getElementById("magic").innerText)
+    return parseNumber(getElementById("magic").innerText)
 }
 
-const get_gold_per_second = () => parseNumber(document.getElementById("goldPerSecond").innerText)
+const get_gold_per_second = () => parseNumber(getElementById("goldPerSecond").innerText)
 
 function get_knowledge_cost(level, sigil) {
     set_trade_level(level)
     const sigilIndex = sigils.indexOf(sigil)
-    const knowledge_trade_cost_ranges = document.getElementsByClassName("knowledgeTradeCostRange");
+    const knowledge_trade_cost_ranges = getElementsByClassName("knowledgeTradeCostRange");
     const knowledge_trade_cost_range = knowledge_trade_cost_ranges[sigilIndex].innerText.split(" - ");
     return parseNumber(knowledge_trade_cost_range[1])
 }
@@ -551,7 +682,7 @@ function choose_trade_level() {
     if (Date.now() < chooseTradeLevelAt) return;
     chooseTradeLevelAt = Date.now() + 10000;
     // get max of knowledgeLevelInput
-    const knowledge_level_input = document.getElementById("knowledgeLevelInput");
+    const knowledge_level_input = getElementById("knowledgeLevelInput");
     const max_level = knowledge_level_input.max;
     const min_level = knowledge_level_input.min;
     const spend_sigils_divider = 10 ** settings.spend_sigis_divider_exponent.value
@@ -573,8 +704,8 @@ function choose_trade_level() {
 }
 
 function set_trade_level(level) {
-    const knowledge_level_input = document.getElementById("knowledgeLevelInput");
-    const knowledge_level_range = document.getElementById("knowledgeLevelRange");
+    const knowledge_level_input = getElementById("knowledgeLevelInput");
+    const knowledge_level_range = getElementById("knowledgeLevelRange");
     knowledge_level_input.value = level
     knowledge_level_range.value = level
     knowledge_level_input.dispatchEvent(new Event('input', {bubbles: true}));
@@ -584,7 +715,7 @@ function set_trade_level(level) {
 
 function buy_knowledge_trade() {
     if (gets_automatic_knowledge()) return;
-    const knowledge_trades = document.getElementsByClassName("knowledgeTradeDiv");
+    const knowledge_trades = getElementsByClassName("knowledgeTradeDiv");
     for (let i = knowledge_trades.length - 1; i >= 0; i--) {
         const knowledge_trade = knowledge_trades[i];
         choose_trade_level()
@@ -612,136 +743,178 @@ async function mine_starting_gold() {
 function buy_miners() {
     const buy_miners = settings.buy_miners.value
     if (!buy_miners || is_auto_mine_enabled()) return;
-    document.getElementById("buyMinerButton").nextElementSibling.click();
+    getElementById("buyMinerButton").nextElementSibling.click();
 }
 
 function has_dragon() {
-    const unlock_dragon_button = document.getElementById("unlockDragonButton");
+    const unlock_dragon_button = getElementById("unlockDragonButton");
     return unlock_dragon_button.style.display === "none";
 }
 
 function unlock_dragon() {
     if (has_dragon()) return;
-    document.getElementById("unlockDragonButton").click();
+    getElementById("unlockDragonButton").click();
 }
 
 function has_fire_upgrade() {
-    const fire_upgrade = document.getElementById("buyFireUpgradesButton");
+    const fire_upgrade = getElementById("buyFireUpgradesButton");
     return fire_upgrade.style.display === "none";
 }
 
 function unlock_fire_upgrade() {
     if (has_fire_upgrade()) return;
-    document.getElementById("buyFireUpgradesButton").click();
+    getElementById("buyFireUpgradesButton").click();
 }
 
 function has_alchemy_upgrade() {
     // unlockAlchemyButton
-    const alchemy_upgrade = document.getElementById("unlockAlchemyButton");
+    const alchemy_upgrade = getElementById("unlockAlchemyButton");
     return alchemy_upgrade.style.display === "none";
 }
 
 function unlock_alchemy_upgrade() {
     if (has_alchemy_upgrade()) return;
-    document.getElementById("unlockAlchemyButton").click();
+    getElementById("unlockAlchemyButton").click();
 }
 
 function has_magic_upgrade() {
-    const magic_upgrade = document.getElementById("unlockMagicButton");
+    const magic_upgrade = getElementById("unlockMagicButton");
     return magic_upgrade.style.display === "none";
 }
 
 function unlock_magic_upgrade() {
     if (has_magic_upgrade()) return;
-    document.getElementById("unlockMagicButton").click();
+    getElementById("unlockMagicButton").click();
 
 }
 
+let hasMoreMagicUpgrades = false
+
 function has_more_magic_upgrade() {
-    const more_magic_upgrade = document.getElementById("moreMagicUpgradesButton");
-    return more_magic_upgrade.style.display === "none";
+    if (!hasMoreMagicUpgrades) {
+        const more_magic_upgrade = getElementById("moreMagicUpgradesButton");
+        hasMoreMagicUpgrades = more_magic_upgrade.style.display === "none";
+    }
+
+    return hasMoreMagicUpgrades;
 }
 
 function unlock_more_magic_upgrade() {
     if (has_more_magic_upgrade()) return;
-    document.getElementById("moreMagicUpgradesButton").click();
+    getElementById("moreMagicUpgradesButton").click();
 }
 
+
+let hasMorePlatinumAndUraniumUpgrades = false
+
 function has_more_platinum_and_uranium_upgrades() {
-    const more_pu_upgrades = document.getElementById("morePUupgradesButton");
-    return more_pu_upgrades.style.display === "none";
+    if (!hasMorePlatinumAndUraniumUpgrades) {
+        const more_pu_upgrades = getElementById("morePUupgradesButton");
+        hasMorePlatinumAndUraniumUpgrades = more_pu_upgrades.style.display === "none";
+    }
+
+    return hasMorePlatinumAndUraniumUpgrades
 }
+
 
 function unlock_more_platinum_and_uranium_upgrades() {
     if (has_more_platinum_and_uranium_upgrades()) return;
-    document.getElementById("morePUupgradesButton").click();
+    getElementById("morePUupgradesButton").click();
 }
 
+let hasDarkMagicUpgrade = false
+
 function has_dark_magic_upgrade() {
-    const dark_magic_upgrade = document.getElementById("unlockDarkMagicUpgradesButton");
-    return dark_magic_upgrade.style.display === "none";
+    if (!hasDarkMagicUpgrade) {
+        const dark_magic_upgrade = getElementById("unlockDarkMagicUpgradesButton");
+        hasDarkMagicUpgrade = dark_magic_upgrade.style.display === "none";
+    }
+
+    return hasDarkMagicUpgrade
 }
 
 function unlock_dark_magic_upgrade() {
     if (has_dark_magic_upgrade()) return;
-    document.getElementById("unlockDarkMagicUpgradesButton").click();
+    getElementById("unlockDarkMagicUpgradesButton").click();
 }
 
+let hasMoreDarkMagicUpgrades = false
+
 function has_more_dark_magic_upgrade() {
-    const more_dark_magic_upgrade = document.getElementById("moreDarkMagicUpgradesButton");
-    return more_dark_magic_upgrade.style.display === "none";
+    if (!hasMoreDarkMagicUpgrades) {
+        const more_dark_magic_upgrade = getElementById("moreDarkMagicUpgradesButton");
+        hasMoreDarkMagicUpgrades = more_dark_magic_upgrade.style.display === "none";
+    }
+
+    return hasMoreDarkMagicUpgrades;
 }
 
 function unlock_more_dark_magic_upgrade() {
     if (has_more_dark_magic_upgrade()) return;
-    document.getElementById("moreDarkMagicUpgradesButton").click();
+    getElementById("moreDarkMagicUpgradesButton").click();
 }
 
+let hasBloodUpgrade = false
+
 function has_blood_upgrade() {
-    const blood_upgrade = document.getElementById("unlockBloodButton");
-    return blood_upgrade.style.display === "none";
+    if (!hasBloodUpgrade) {
+        const blood_upgrade = getElementById("unlockBloodButton");
+        hasBloodUpgrade = blood_upgrade.style.display === "none";
+    }
+
+    return hasBloodUpgrade;
 }
 
 function unlock_blood() {
     if (has_blood_upgrade()) return;
-    document.getElementById("unlockBloodButton").click();
+    getElementById("unlockBloodButton").click();
 }
 
 function selectHellLayer(level) {
     // select nth option in #hellLayer
-    const hell_layer = document.getElementById("hellLayer");
+    const hell_layer = getElementById("hellLayer");
     hell_layer.selectedIndex = level;
     hell_layer.dispatchEvent(new Event('change'));
 }
 
 
+let inHell = false;
+
 function enterHell(level) {
+    inHell = true;
     selectHellLayer(level)
-    const enterHellButton = document.getElementById("enterHellButton");
+    const enterHellButton = getElementById("enterHellButton");
     if (enterHellButton.innerText === "Exit hell") return;
     enterHellButton.click();
     post_reset()
 }
 
 function exitHell() {
-    const enterHellButton = document.getElementById("enterHellButton");
+    inHell = false;
+    const enterHellButton = getElementById("enterHellButton");
     if (enterHellButton.innerText === "Enter hell") return;
     enterHellButton.click();
 }
 
-
-function upgrade_dragon() {
-    const buttons = document.getElementsByClassName("upgradeDragonButton");
+function get_upgrade_dragon_button() {
+    const buttons = getElementsByClassName("upgradeDragonButton");
     for (let i = 0; i < buttons.length; i++) {
         if (buttons[i].style.display !== "none") {
-            buttons[i].click();
+            return buttons[i];
         }
     }
+
+    return null;
+}
+
+function upgrade_dragon() {
+    const upgradeDragonsButton = getCachedData("upgradeDragonsButton", get_upgrade_dragon_button)
+    if (upgradeDragonsButton !== null) upgradeDragonsButton.click();
 }
 
 function unlocked_challenges() {
     // check if tab_magicChallenges has display none
-    const tab_magicChallenges = document.getElementById("tab_magicChallenges");
+    const tab_magicChallenges = getElementById("tab_magicChallenges");
     return tab_magicChallenges.style.display !== "none";
 }
 
@@ -774,36 +947,36 @@ async function do_challenge(n) {
 }
 
 function is_challenge_enabled(challenge_number) {
-    const challenge_div = document.getElementsByClassName("magicChallenge")[challenge_number];
+    const challenge_div = getElementsByClassName("magicChallenge")[challenge_number];
     const challenge_div_color = challenge_div.style.color;
     return challenge_div_color !== "white";
 }
 
 function enable_challenge(challenge_number) {
     if (!is_challenge_enabled(challenge_number)) {
-        document.getElementsByClassName("magicChallenge")[challenge_number].click();
+        getElementsByClassName("magicChallenge")[challenge_number].click();
     }
 }
 
 function disable_challenge(challenge_number) {
     if (is_challenge_enabled(challenge_number)) {
-        document.getElementsByClassName("magicChallenge")[challenge_number].click();
+        getElementsByClassName("magicChallenge")[challenge_number].click();
     }
 }
 
 function start_challenge() {
     // verify we are not yet in a challenge, then there is a text "You are not in any challenges!"
-    if (document.getElementById("activeChallenges").innerText === "You are not in any challenges!") {
+    if (getElementById("activeChallenges").innerText === "You are not in any challenges!") {
         // click on the challenge button
-        document.getElementById("magicChallengeButton").click();
+        getElementById("magicChallengeButton").click();
     }
 }
 
 function stop_challenge() {
     // verify we are not yet in a challenge, then there is a text "You are not in any challenges!"
-    if (document.getElementById("activeChallenges").innerText !== "You are not in any challenges!") {
+    if (getElementById("activeChallenges").innerText !== "You are not in any challenges!") {
         // click on the challenge button
-        document.getElementById("magicChallengeButton").click();
+        getElementById("magicChallengeButton").click();
     }
 }
 
@@ -818,7 +991,7 @@ function enable_challenge_combo(challenge_combo) {
 }
 
 function get_dragon_stage_counter() {
-    const dragon_stage_counter = document.getElementById("dragonStageCounter");
+    const dragon_stage_counter = getElementById("dragonStageCounter");
     return dragon_stage_counter.innerText;
 }
 
@@ -855,7 +1028,7 @@ function capitalize(string) {
 }
 
 function buy_max_sigil_upgrades() {
-    const sigilResetAutomation = document.getElementById("sigilResetAutomation");
+    const sigilResetAutomation = getElementById("sigilResetAutomation");
     if (sigilResetAutomation === null || sigilResetAutomation.style.display === "none") return;
     const button = sigilResetAutomation.nextElementSibling
     if (button === null || button.disabled) return;
@@ -864,7 +1037,7 @@ function buy_max_sigil_upgrades() {
     // for all colors in sigils
     for (let i = 0; i < sigils.length; i++) {
         let sigil = sigils[i];
-        const maxUpgrades = document.getElementById(`max${capitalize(sigil)}SigilUpgradesButton`);
+        const maxUpgrades = getElementById(`max${capitalize(sigil)}SigilUpgradesButton`);
         if (maxUpgrades !== null && !maxUpgrades.disabled) {
             maxUpgrades.click()
         }
@@ -1061,29 +1234,12 @@ function update_statistics() {
     if (compareExponent(parseExponent(curGold), parseExponent(maxGold)) > 0) {
         statistics.maxGold.value = curGold
     }
-
-    statistics.curCyanSigils.value = get_sigil_count("cyan")
-    statistics.curBlueSigils.value = get_sigil_count("blue")
-    statistics.curVioletSigils.value = get_sigil_count("violet")
-    statistics.curPinkSigils.value = get_sigil_count("pink")
-    statistics.curIndigoSigils.value = get_sigil_count("indigo")
-    statistics.curRedSigils.value = get_sigil_count("red")
-    statistics.curOrangeSigils.value = get_sigil_count("orange")
-    statistics.curYellowSigils.value = get_sigil_count("yellow")
-    statistics.maxBlueSigils.value = Math.max(statistics.maxBlueSigils.value, statistics.curBlueSigils.value)
-    statistics.maxCyanSigils.value = Math.max(statistics.maxCyanSigils.value, statistics.curCyanSigils.value)
-    statistics.maxVioletSigils.value = Math.max(statistics.maxVioletSigils.value, statistics.curVioletSigils.value)
-    statistics.maxPinkSigils.value = Math.max(statistics.maxPinkSigils.value, statistics.curPinkSigils.value)
-    statistics.maxIndigoSigils.value = Math.max(statistics.maxIndigoSigils.value, statistics.curIndigoSigils.value)
-    statistics.maxRedSigils.value = Math.max(statistics.maxRedSigils.value, statistics.curRedSigils.value)
-    statistics.maxOrangeSigils.value = Math.max(statistics.maxOrangeSigils.value, statistics.curOrangeSigils.value)
-    statistics.maxYellowSigils.value = Math.max(statistics.maxYellowSigils.value, statistics.curYellowSigils.value)
     statistics.nextReset.value = itemToReset()
 
     // update value of each stat
     for (const stat in statistics) {
         // if value is null, hide the stat
-        let statElement = document.getElementById(stat)
+        let statElement = getElementById(stat)
         if (statistics[stat].value === 0 || statistics[stat].value === Infinity) {
             statElement.parentElement.style.display = 'none';
             continue;
@@ -1102,30 +1258,31 @@ function update_statistics() {
 }
 
 function unlocked_blood() {
-    return document.getElementById('tab_blood').style.display !== 'none'
+    return getElementById('tab_blood').style.display !== 'none'
 }
 
 function get_hell_levels() {
-    let hellLayer = document.getElementById("hellLayer")
+    let hellLayer = getElementById("hellLayer")
     return hellLayer.children
 }
 
 function get_blood_per_seconds() {
-    return parseNumber(document.getElementById('bloodPerSecond').innerText)
+    return parseNumber(getElementById('bloodPerSecond').innerText)
 }
 
 function get_current_blood() {
-    return parseNumber(document.getElementById('blood').innerText)
+    return parseNumber(getElementById('blood').innerText)
 }
 
 const optimizeHellCooldown = 1000 * 60;
+
 async function optimize_blood_level() {
     if (statistics.optimizedHellLevelAt.value + optimizeHellCooldown > Date.now()) return statistics.optimizedHellLevel.value
     let maxBloodPerSec = 0
     let bestBloodLevel = 0
     const hellLevels = get_hell_levels()
     const maxLevel = hellLevels.length - 1
-    const minLevel = hellLevels.length === 5 ? 3 : 0
+    const minLevel = get_sigil_count('red') > 0 ? 3 : 0
     for (let i = maxLevel; i >= minLevel; i--) {
         enterHell(i)
         await idle_loop(2)
@@ -1147,6 +1304,7 @@ async function optimize_blood_level() {
 async function farm_blood() {
     if (!unlocked_blood()) return;
     if (settings.disable_hell.value) return;
+    if (parseExponent(get_current_gold()).length < 3 && tetrahedronUpgradeCount < 7) return;
     const bestBloodLevel = await optimize_blood_level();
     if (bestBloodLevel === -1) {
         // don't farm
@@ -1162,6 +1320,8 @@ async function farm_blood() {
 
 async function game_loop() {
     while (settings.enabled.value) {
+        stop_challenge()
+        exitHell()
         await mine_starting_gold()
         await do_challenges() // do 5 challenge loops, 75 seconds in total
         await farm_blood() // 30 seconds + 3 seconds for each level attempted
