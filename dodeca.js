@@ -16,11 +16,11 @@ let settings = {
     time_in_challenge: {"name": "Seconds per challenge", "value": 3, "type": "number"},
     reset_cooldown: {"name": "Reset cooldown", "value": 3, "type": "number"},
     reset_magic_after: {"name": "Reset magic after", "value": 0, "type": "number"},
-    reset_sigils_after: {"name": "Reset sigils after", "value": 1, "type": "number"},
+    resetAfter: {"name": "Reset sigils after", "value": 1, "type": "number"},
     spend_sigis_divider_exponent: {"name": "Spend sigils divider exponent", "value": 2, "type": "number"},
     spend_knowledge_divider_exponent: {"name": "Spend knowledge divider exponent", "value": 2, "type": "number"},
     disable_hell: {"name": "Disable hell", "value": false, "type": "boolean"},
-    disable_knowledge_upgrades: {"name": "Disable knowledge upgrades", "value": false, "type": "boolean"},
+    disable_reset: {"name": "Disable reset", "value": false, "type": "boolean"},
 
 }
 
@@ -30,8 +30,8 @@ let statistics = {
     lastResetTime: {"name": "Last reset time", "value": new Date().getTime(), "type": "number", "visible": false},
     timeSinceLastReset: {"name": "Seconds since last reset", "value": 0, "type": "number"},
     timeForLastReset: {"name": "Seconds for last reset", "value": 0, "type": "number"},
-    sigilLastReset: {"name": "Sigil last reset", "value": "none", "type": "string"},
-    sigilNextReset: {"name": "Sigil next reset", "value": "none", "type": "string"},
+    lastReset: {"name": "Sigil last reset", "value": "none", "type": "string"},
+    nextReset: {"name": "Sigil next reset", "value": "none", "type": "string"},
     totalMagicResets: {"name": "Total magic resets", "value": 0, "type": "number", "visible": false},
     curCyanSigils: {"name": "Cur cyan sigils", "value": 0, "type": "number", "visible": true},
     curBlueSigils: {"name": "Cur blue sigils", "value": 0, "type": "number", "visible": true},
@@ -85,7 +85,7 @@ localStorage.setItem(settingsKey, JSON.stringify(settings));
 
 
 function is_sigil_available(sigil) {
-    return document.getElementById(`tab_${sigil}Sigils`).style.display !== "none";
+    return document.getElementById(`tab_${sigil}Sigils`).style.display !== "none"
 }
 
 function get_sigil_count(sigil) {
@@ -116,6 +116,7 @@ function has_achievement(id) {
 }
 
 const gets_automatic_sigils = () => has_achievement("ach13x0");
+const gets_automatic_uranium = () => has_achievement("ach5x3");
 const gets_automatic_max_tomes = () => has_achievement("ach14x1");
 const gets_automatic_knowledge = () => has_achievement("ach15x0");
 const gets_automatic_knowledge_upgrades = () => has_achievement("ach11x7");
@@ -142,18 +143,12 @@ let currentSigilRotation = 0
 let dontResetForBlueFireAt = Date.now() + 5000
 let dontResetForBlueFireUntil = Date.now()  + 10000
 
-function sigil_to_reset() {
+function itemToReset() {
     const available_sigils = available_sigils_to_reset();
 
     // don't reset yet
     if (available_sigils.length === 0) return;
     if (statistics.timeSinceLastReset.value < settings.reset_cooldown.value) return;
-
-    return choose_sigil()
-}
-
-function choose_sigil() {
-    const available_sigils = available_sigils_to_reset();
 
     const unlocked_red = available_sigils.includes("red")
     if (unlocked_red) {
@@ -164,6 +159,17 @@ function choose_sigil() {
         }
     }
 
+    const unlocked_holyTetrahedrons = has_unlocked_holyTetrahedrons()
+    if(unlocked_holyTetrahedrons) return "holyTetrahedrons"
+    return choose_sigil(available_sigils) + "Sigils";
+}
+
+function has_unlocked_holyTetrahedrons() {
+    return document.getElementById("tab_holyTetrahedrons").style.display !== "none";
+}
+
+function choose_sigil(available_sigils) {
+    const unlocked_red = available_sigils.includes("red")
     if (gets_automatic_sigils() && !unlocked_red) return;
     if (available_sigils.length === 1) return available_sigils[0];
     if (get_sigil_count("pink") > 0 && !unlocked_red) return available_sigils[currentSigilRotation % available_sigils.length];
@@ -229,21 +235,20 @@ function buy_plutonium_upgrades() {
     }
 }
 
-function get_uranium_per_second() {
-    // extraUraniumPerSecond is the ID
-    return parseNumber(document.getElementById("extraUraniumPerSecond").innerText);
+// holyTetrahedronUpgrade
+function buy_holy_tetrahedron_upgrades() {
+    const buttons = document.getElementsByClassName("holyTetrahedronUpgrade");
+    for (let i = 0; i < buttons.length; i++) {
+        if (!buttons[i].disabled) {
+            buttons[i].click();
+            return;
+        }
+    }
 }
-
-function uranium_to_get() {
-    return parseNumber(document.getElementById("uraniumToGet").innerText);
-}
-
-let disable_uranium_farm = false;
 
 function farm_uranium() {
-    if (!disable_uranium_farm && uranium_to_get() > get_uranium_per_second() * 2) {
-        document.getElementById("uraniumConvertButton").click();
-    }
+    if (gets_automatic_uranium()) return
+    document.getElementById("uraniumConvertButton").click();
 }
 
 function farm_tomes() {
@@ -277,7 +282,6 @@ function buy_uranium_upgrades() {
         return;
     }
 
-    disable_uranium_farm = true;
     document.getElementById("uraniumMaxAllButton").click();
 }
 
@@ -312,7 +316,6 @@ function get_current_knowledge() {
 }
 
 function spent_knowledge() {
-    if (settings.disable_knowledge_upgrades.value) return;
     if (!gets_automatic_max_tomes()) farm_tomes()
     if (!gets_automatic_knowledge_upgrades()) buy_knowledge_upgrades()
 }
@@ -386,17 +389,22 @@ function spend_time_with_dragon() {
     document.getElementById("dragonSpendTimeButton").click();
 }
 
-function reset_progress_for_sigils() {
-    const resetSigil = statistics.sigilNextReset.value
-    const resetSigilAfter = settings.reset_sigils_after.value
-    if(!sigils.includes(resetSigil) || resetSigilAfter === 0) return;
 
-    const sigilsToGetElement = document.getElementById(resetSigil + "SigilsToGet")
-    const sigilsToGet = parseNumber(sigilsToGetElement.innerText);
-    if (sigilsToGet >= resetSigilAfter) {
-        sigilsToGetElement.parentElement.click();
+
+function resetProgress() {
+    const resetItem = statistics.nextReset.value
+    const resetAfter = settings.resetAfter.value
+    const disableReset = settings.disable_reset.value
+    if(resetAfter === 0 || disableReset) return;
+
+
+    const toGetElement = document.getElementById(resetItem + "ToGet")
+    if(toGetElement === null) return;
+    const itemCount = parseNumber(toGetElement.innerText);
+    if (itemCount >= resetAfter) {
+        toGetElement.parentElement.click();
         post_reset()
-        statistics.sigilLastReset.value = resetSigil;
+        statistics.lastReset.value = resetItem;
     }
 }
 
@@ -454,9 +462,10 @@ function buy_upgrades() {
     buy_tomes_upgrades()
     buy_blue_fire_upgrades();
     reset_progress_for_magic();
-    reset_progress_for_sigils()
+    resetProgress()
     farm_plutonium()
     buy_plutonium_upgrades()
+    buy_holy_tetrahedron_upgrades()
 }
 
 let EASY_CHALLENGE_COMBOS = [
@@ -1056,7 +1065,7 @@ function update_statistics() {
     statistics.maxRedSigils.value = Math.max(statistics.maxRedSigils.value, statistics.curRedSigils.value)
     statistics.maxOrangeSigils.value = Math.max(statistics.maxOrangeSigils.value, statistics.curOrangeSigils.value)
     statistics.maxYellowSigils.value = Math.max(statistics.maxYellowSigils.value, statistics.curYellowSigils.value)
-    statistics.sigilNextReset.value = sigil_to_reset()
+    statistics.nextReset.value = itemToReset()
 
     // update value of each stat
     for (const stat in statistics) {
@@ -1114,10 +1123,10 @@ async function optimize_blood_level() {
         exitHell()
     }
 
+    // don't go into hell
+    if (get_current_blood() > 600 * maxBloodPerSec || maxBloodPerSec) bestBloodLevel = -1
     statistics.optimizedHellLevel.value = bestBloodLevel
     statistics.optimizedHellLevelAt.value = Date.now()
-    // 10 minutes of farming
-    if (get_current_blood() > 600 * maxBloodPerSec) return -1;
 
     return bestBloodLevel;
 }
