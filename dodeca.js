@@ -543,7 +543,7 @@ function buy_magic_upgrades() {
 
 const magicCosts = [2, 3, 8, 12, 30, 100, 300, 1500, 4000, 20000, 100000, 400000]
 
-function next_magic_cost() {
+function getNextMagicCost() {
     const buttons = getElementsByClassName("magicUpgrade");
     for (let i = 0; i < buttons.length; i++) {
         if (!buttons[i].disabled) {
@@ -604,18 +604,17 @@ function buy_blue_fire_upgrades() {
 
 function choose_reset_magic() {
     if (settings.reset_magic_cooldown.value > statistics.timeSinceLastMagicReset.value) return;
-    const reset_magic_after = settings.reset_magic_after.value
-    const magic_to_get = parseNumber(getElementById("magicToGet").innerText);
+    if(gets_automatic_magic()) return;
 
-    let should_reset = reset_magic_after !== 0 && magic_to_get >= reset_magic_after
 
     // if we can progress more than 1/10 of the way to the next magic upgrade, reset
-    should_reset |= !gets_automatic_magic() && reset_magic_after === 0 && magic_to_get > next_magic_cost() / 10 + 1
+    const nextMagicCost = getNextMagicCost()
+    const magicToGet = parseNumber(getElementById("magicToGet").innerText);
+    const currentMagic = parseNumber(getCurrentMagic());
+    if(magicToGet === 0) return;
 
-    // if we don't have any more upgrades to buy, reset if our current magic is at least doubled
-    should_reset |= !gets_automatic_magic() && reset_magic_after === 0 && magic_to_get > parseNumber(get_current_magic()) * 2
-
-    if (should_reset) return "magic";
+    if(nextMagicCost && magicToGet >= Math.floor(nextMagicCost / 10) + 1) return "magic";
+    if(magicToGet > currentMagic * 2) return "magic";
 }
 
 function post_reset(resetItem) {
@@ -745,7 +744,7 @@ function get_current_gold() {
     return getElementById("gold").innerText
 }
 
-function get_current_magic() {
+function getCurrentMagic() {
     return getElementById("magic").innerText
 }
 
@@ -1327,7 +1326,7 @@ function updateStatistics() {
     }
 
     // curMagic && maxMagic
-    const curMagic = get_current_magic()
+    const curMagic = getCurrentMagic()
     statistics.curMagic.value = curMagic
     const maxMagic = statistics.maxMagic.value
     if (compareExponent(parseExponent(curMagic), parseExponent(maxMagic)) > 0) {
