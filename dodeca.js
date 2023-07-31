@@ -14,7 +14,6 @@ let settings = {
     // setting to reset after X sigils, 0 to disable
     enabled: {"name": "Enabled", "value": true, "type": "boolean"},
     mine_gold_clicks: {"name": "Mine gold clicks/sec", "value": 1, "type": "number"},
-    buy_miners: {"name": "Buy miners", "value": true, "type": "boolean"},
     time_in_challenge: {"name": "Seconds per challenge", "value": 3, "type": "number"},
     reset_magic_cooldown: {"name": "Reset magic cooldown", "value": 1, "type": "number"},
     reset_sigils_cooldown: {"name": "Reset sigils cooldown", "value": 1, "type": "number"},
@@ -184,6 +183,7 @@ function has_achievement(id) {
     return hasAchievement
 }
 
+const gets_automatic_miners = () => has_achievement("ach0x8");
 const gets_automatic_fire_upgrades = () => has_achievement("ach6x2");
 const gets_automatic_sigils = () => has_achievement("ach13x0");
 const gets_automatic_uranium = () => has_achievement("ach5x3");
@@ -357,10 +357,6 @@ function choose_reset_sigil() {
 
 function delay(time) {
     return new Promise(resolve => setTimeout(resolve, time));
-}
-
-function is_auto_mine_enabled() {
-    return getElementById("minerAutoBuyMaxButton").innerText === "Auto max all: On";
 }
 
 function buy_fire_upgrades() {
@@ -827,17 +823,9 @@ function mine_gold(loop) {
     }
 }
 
-async function mine_starting_gold() {
-    while (get_gold_per_second() < 20) {
-        mine_gold_button.click();
-        buy_miners()
-        await delay(ITERATION_SPEED_MS)
-    }
-}
-
 function buy_miners() {
-    const buy_miners = settings.buy_miners.value
-    if (!buy_miners || is_auto_mine_enabled()) return;
+    if (gets_automatic_miners()) return;
+    console.log(getElementById("buyMinerButton").nextElementSibling)
     getElementById("buyMinerButton").nextElementSibling.click();
 }
 
@@ -1600,9 +1588,10 @@ async function farm_blood() {
 }
 
 function buy_upgrades(loop) {
-    mine_gold(loop)
     updateStatistics()
     updateStatisticsModal()
+    mine_gold(loop)
+    buy_miners()
     unlock_dragon()
     upgrade_dragon()
     unlock_fire_upgrade()
@@ -1613,7 +1602,6 @@ function buy_upgrades(loop) {
     unlock_dark_magic_upgrade()
     unlock_more_dark_magic_upgrade()
     unlock_blood()
-    buy_miners()
     buy_dragon_feed();
     pet_dragon()
     buy_fire_upgrades();
@@ -1656,7 +1644,6 @@ async function game_loop() {
         stop_challenge()
         exitHell()
         buy_upgrades(0)
-        await mine_starting_gold()
         await do_challenges()
         await farm_blood()
         await idle_loop(5)
