@@ -879,15 +879,8 @@ function unlock_magic_upgrade() {
 
 }
 
-let hasMoreMagicUpgrades = false
-
 function has_more_magic_upgrade() {
-    if (!hasMoreMagicUpgrades) {
-        const more_magic_upgrade = getElementById("moreMagicUpgradesButton");
-        hasMoreMagicUpgrades = more_magic_upgrade.style.display === "none";
-    }
-
-    return hasMoreMagicUpgrades;
+    return getElementById("moreMagicUpgradesButton").style.display === "none";
 }
 
 function unlock_more_magic_upgrade() {
