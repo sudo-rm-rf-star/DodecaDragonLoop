@@ -809,8 +809,15 @@ function buy_knowledge_trade() {
 const mine_gold_button = get_mine_gold_button()
 
 function mine_gold(loop) {
+    const goldPerSec = get_gold_per_second();
+    const goldPerClick = parseNumber(getElementById("goldPerClick").innerText);
     const loopsPerSecond = 1000 / ITERATION_SPEED_MS;
+    const goldPerSecByClick = goldPerClick * settings.mine_gold_clicks.value;
     const clickCount = Math.floor(settings.mine_gold_clicks.value / loopsPerSecond);
+
+    if(goldPerSec > 1e308) return;
+    if(goldPerSec > 10 * goldPerSecByClick) return;
+
     if (clickCount > 0) {
         for (let i = 0; i < clickCount; i++) {
             mine_gold_button.click();
