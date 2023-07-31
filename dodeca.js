@@ -825,8 +825,10 @@ function mine_gold(loop) {
 
 function buy_miners() {
     if (gets_automatic_miners()) return;
-    console.log(getElementById("buyMinerButton").nextElementSibling)
-    getElementById("buyMinerButton").nextElementSibling.click();
+    const minerCostElement = getElementById("minerCost");
+    const minerCost = parseNumber(minerCostElement.innerText);
+    const currentGold = parseNumber(get_current_gold());
+    if (10 * minerCost < currentGold) minerCostElement.parentElement.click()
 }
 
 function has_dragon() {
